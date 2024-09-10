@@ -4,6 +4,7 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 from openhdemg.library.mathtools import compute_sil
+from openhdemg.library.plotemg import showgoodlayout
 
 
 
@@ -145,10 +146,11 @@ def plot_ipts(
 
         # Connect the key press event
     def on_key(event):
-        if event.key == 'left':
+        if event.key == 'left' or event.key == 'a':
             scroll_left()
-        elif event.key == 'right':
+        elif event.key == 'right' or event.key == 'd':
             scroll_right()
+
 
     def scroll_left():
         current_xlim = ax1.get_xlim()
@@ -190,7 +192,6 @@ def plot_ipts(
         if current_index > 0:
             current_index -= 1
             plot_current_mu(current_index)
-            update_slider()
             fig.canvas.draw_idle()
 
     def next_mu(event):
@@ -198,7 +199,6 @@ def plot_ipts(
         if current_index < emgfile["NUMBER_OF_MUS"] - 1:
             current_index += 1
             plot_current_mu(current_index)
-            update_slider()
             fig.canvas.draw_idle()
 
     # Create buttons for navigation
