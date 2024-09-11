@@ -1,10 +1,11 @@
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Button
+from matplotlib.widgets import Button, RectangleSelector
 import seaborn as sns
 import pandas as pd
 import numpy as np
 from openhdemg.library.mathtools import compute_sil
 from openhdemg.library.plotemg import showgoodlayout
+from matplotlib.widgets import Cursor
 
 
 
@@ -82,16 +83,8 @@ def plot_ipts(
             ax1.plot(x_axis, ipts[mu_index])
             ax1.set_ylabel(f"MU {mu_index +1}")
 
-            pulses = mu_pulses[mu_index]
-            
-            # Plot red circles at peaks (x = pulses, y = ipts value at pulse time)
-            for pulse in pulses:
-                # Find the corresponding y-value at this time (interpolate if necessary)
-                closest_idx = (np.abs(x_axis - pulse)).argmin()
-                y_value = ipts.iloc[closest_idx, mu_index]  # Get the corresponding y-value
-                
-                # Add a red circle at the pulse and the corresponding y-value
-                ax1.plot(pulse, y_value, 'ro', markersize=2, label='Peak') 
+                      
+            plot_peaks(mu_pulses, mu_index) 
             sil_value = compute_sil(ipts[mu_index], emgfile["MUPULSES"][mu_index])
 
             # Display the SIL value at the top center of the plot
@@ -105,7 +98,16 @@ def plot_ipts(
                 fontweight='bold'  # Bold text
             )
 
-
+    def plot_peaks(mu_pulses, mu_index):
+        pulses = mu_pulses[mu_index]
+        # Plot red circles at peaks (x = pulses, y = ipts value at pulse time)
+        for pulse in pulses:
+            # Find the corresponding y-value at this time (interpolate if necessary)
+            closest_idx = (np.abs(x_axis - pulse)).argmin()
+            y_value = ipts.iloc[closest_idx, mu_index]  # Get the corresponding y-value
+            
+            # Add a red circle at the pulse and the corresponding y-value
+            ax1.plot(pulse, y_value, 'ro', markersize=2, label='Peak')
 
     # Plot the initial MU
     plot_current_mu(current_index)
@@ -177,7 +179,8 @@ def plot_ipts(
     # Add instructions to the plot
     instructions = (
         "Mouse Wheel: Zoom in/out\n"
-        "Left/Right Arrow Keys: Scroll left/right"
+        "Left/Right Arrow Keys: Scroll left/right\n"
+        "Click and Drag: Select region for new peaks"
     )
 
     # Add text annotation
@@ -212,6 +215,39 @@ def plot_ipts(
 
     ax1.set_xlim([min(x_axis),max(x_axis)])
 
+    
+    def onselect(eclick, erelease):
+        # Called when a box selection is made
+        x1, x2 = eclick.xdata, erelease.xdata
+        if x1 > x2:
+            x1, x2 = x2, x1
+
+        y1, y2 = eclick.ydata, erelease.ydata
+        if y1 > y2:
+            y1, y2 = y2, y1
+
+        mask= (x_axis > min(x1,x2)) & (x_axis < max(x1,x2)) & (ipts[current_index] > min(y1,y2)) & (ipts[current_index] < max(y1,y2))
+        xmasked = x_axis[mask]
+        ymasked = ipts[current_index][mask]
+        
+
+        if len(xmasked) > 0:
+            xmax = xmasked[np.argmax(ymasked)]
+            ymax = ymasked.max()
+            ax1.plot(xmax, ymax, 'ro', markersize=2, label='Peak')
+
+        fig.canvas.draw_idle()
+
+        
+
+    # Initialize the RectangleSelector
+    rect_selector = RectangleSelector(
+        ax1,
+        onselect,
+        useblit=True,
+        button=[1],  # Left mouse button
+    )
+    
     if showimmediately:
         plt.show()
 
