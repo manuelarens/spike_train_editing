@@ -12,12 +12,12 @@ from tkinter import filedialog
 
 from offline_EMG import EMG_Decomposition
 from TMSiFileFormats.file_readers import Poly5Reader, Xdf_Reader, Edf_Reader
-from OpenHDEMG import IptsPlotter
+from EditMU import EditMU
 
 grid_type = '4-8-L'
 
 
-#filepath = filedialog.askopenfilename(title = 'Select data file', filetypes = (('data-file (.poly5)', '*.poly5'),('All files', '*.*')),initialdir=r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements')
+#filepath = filedialog.askopenfilename(title = 'Select data file', filetypes = (('data-file (.poly5)', '*.poly5'),('All files', '*.*')),initialdir=measurements_dir)
 """
 if filepath == '':
     print("No file selected. Exiting the script.")
@@ -50,15 +50,10 @@ filepath_decomp = offline_decomp.emg_obj.file_path_json
 print("OFFLINE DECOMPOSITION DONE")
 #"""
 
-### DISPLAY DECOMPOSED MOTOR UNITS
+### DISPLAY DECOMPOSED MOTOR UNITS AND EDIT PEAKS
 #emgfile = filepath_decomp
 emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\Pre_25_b.json')
 
 emgfile = emg.sort_mus(emgfile)
-plotter = IptsPlotter(emgfile)
-#emg.plot_mupulses(emgfile)
-
-### GIVE OPTION TO EDIT MOTOR UNIT
-
-
+plotter = EditMU(emgfile)
 
