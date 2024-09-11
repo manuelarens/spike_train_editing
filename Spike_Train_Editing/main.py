@@ -12,7 +12,7 @@ from tkinter import filedialog
 
 from offline_EMG import EMG_Decomposition
 from TMSiFileFormats.file_readers import Poly5Reader, Xdf_Reader, Edf_Reader
-from OpenHDEMG import plot_ipts
+from OpenHDEMG import IptsPlotter
 
 grid_type = '4-8-L'
 
@@ -55,7 +55,7 @@ print("OFFLINE DECOMPOSITION DONE")
 emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\Pre_25_b.json')
 
 emgfile = emg.sort_mus(emgfile)
-plot_ipts(emgfile)
+plotter = IptsPlotter(emgfile)
 #emg.plot_mupulses(emgfile)
 
 ### GIVE OPTION TO EDIT MOTOR UNIT
