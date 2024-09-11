@@ -55,7 +55,9 @@ print("OFFLINE DECOMPOSITION DONE")
 emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\Pre_25_b.json')
 
 emgfile = emg.sort_mus(emgfile)
+mupulses_before = emgfile["MUPULSES"][0]
 plotter = IptsPlotter(emgfile)
+mupulses_after = plotter.emgfile["MUPULSES"][0]
 #emg.plot_mupulses(emgfile)
 
 ### GIVE OPTION TO EDIT MOTOR UNIT
