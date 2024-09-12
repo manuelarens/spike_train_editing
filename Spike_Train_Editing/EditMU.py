@@ -37,7 +37,7 @@ class EditMU:
 
         # Initialize the current MU index
         self.current_index = 0
-        
+
         # Create plot
         self.fig, self.ax1 = plt.subplots(
             figsize=(figsize[0] / 2.54, figsize[1] / 2.54), num="IPTS"
@@ -168,17 +168,21 @@ class EditMU:
         self.btn_next.on_clicked(self.next_mu)
 
         # Add spikes
-        
-        ax_add = plt.axes([0.85, 0.8, 0.14, 0.04])
+        ax_add = plt.axes([0.85, 0.82, 0.14, 0.04])
         self.btn_add = Button(ax_add, "Add spikes", color=self.button_color)
         self.btn_add.on_clicked(self.add_spikes)
         
-        #"""
         # Remove spikes
-        ax_remove = plt.axes([0.85, 0.74, 0.14, 0.04])
+        ax_remove = plt.axes([0.85, 0.76, 0.14, 0.04])
         self.btn_remove = Button(ax_remove, "Remove spikes", color=self.button_color)
         self.btn_remove.on_clicked(self.remove_spikes)
-        #"""
+
+        # Recalculate filter
+        ax_recalc = plt.axes([0.85, 0.70, 0.14, 0.04])
+        self.btn_recalc = Button(ax_recalc, "Recalc. filter", color=self.button_color)
+        self.btn_recalc.on_clicked(self.recalc_filter)
+
+
 
         self.fig.canvas.draw_idle()  # Force canvas update after button creation
 
@@ -238,7 +242,7 @@ class EditMU:
             self.plot_current_mu()
             self.fig.canvas.draw_idle()
             self.disconnect_buttons()
-
+            
     def onselect_add(self, eclick, erelease):
         x1, x2 = eclick.xdata, erelease.xdata
         y1, y2 = eclick.ydata, erelease.ydata
@@ -260,7 +264,10 @@ class EditMU:
             #plot extra point
             xmax = xmasked[np.argmax(ymasked)]
             ymax = ymasked.max()
-            self.ax1.plot(xmax, ymax, "ro", markersize=2, label="Peak")
+
+            # Plot the peak and store it in self.peak_artists
+            peak_artist, = self.ax1.plot(xmax, ymax, "ro", markersize=2, label="Peak")
+            self.peak_artists.append(peak_artist)  # Store the artist object
             
 
             #add extra point to the emgfile
@@ -283,11 +290,11 @@ class EditMU:
         mask = (
             (self.x_axis > min(x1, x2)) &
             (self.x_axis < max(x1, x2)) &
-            (self.ipts[self.current_index] > min(y1, y2)) &
-            (self.ipts[self.current_index] < max(y1, y2))
+            (self.emgfile["IPTS"][self.current_index] > min(y1, y2)) &
+            (self.emgfile["IPTS"][self.current_index] < max(y1, y2))
         )
         xmasked = self.x_axis[mask]
-        ymasked = self.ipts[self.current_index][mask]
+        ymasked = self.emgfile["IPTS"][self.current_index][mask]
 
         if len(xmasked) > 0:
             # Find the point to remove
@@ -317,7 +324,9 @@ class EditMU:
                     # Redraw the plot to reflect the changes
                     self.fig.canvas.draw_idle()
                     break  # Exit after removing the peak
-
+    
+    def recalc_filter(self, event):
+        return
 
     def add_instructions(self):
         instructions = (
