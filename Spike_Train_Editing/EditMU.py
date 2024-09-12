@@ -234,6 +234,7 @@ class EditMU:
             self.plot_current_mu()
             self.fig.canvas.draw_idle()
             self.disconnect_buttons()
+            self.disconnect_buttons()
             
 
     def next_mu(self, event):
