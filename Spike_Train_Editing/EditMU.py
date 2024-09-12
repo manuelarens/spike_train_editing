@@ -37,7 +37,7 @@ class EditMU:
 
         # Initialize the current MU index
         self.current_index = 0
-        
+
         # Create plot
         self.fig, self.ax1 = plt.subplots(
             figsize=(figsize[0] / 2.54, figsize[1] / 2.54), num="IPTS"
@@ -230,6 +230,7 @@ class EditMU:
             self.plot_current_mu()
             self.fig.canvas.draw_idle()
             self.disconnect_buttons()
+            self.disconnect_buttons()
             
 
     def next_mu(self, event):
@@ -237,6 +238,7 @@ class EditMU:
             self.current_index += 1
             self.plot_current_mu()
             self.fig.canvas.draw_idle()
+            self.disconnect_buttons()
             self.disconnect_buttons()
 
     def onselect_add(self, eclick, erelease):
