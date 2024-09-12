@@ -17,7 +17,8 @@ class EMG_Decomposition():
         ################## FILE ORGANISATION ################################
 
         self.emg_obj.select_file(self.file) #select the training file (.mat), composed by ISpin 
-        self.emg_obj.convert_poly5_xdf(grid_names=[grid_name], muscle_names=['TA'])# adds signal_dict to the self.emg_obj, using Matlab output of ISpin 
+        self.emg_obj.convert_poly5_xdf(grid_names=[grid_name], muscle_names=['TA'])# adds signal_dict to the self.emg_obj, using Matlab output of ISpin
+        print('data loaded')
         self.emg_obj.grid_formatter() # adds spatial context
 
                 #################### BATCHING #######################################
@@ -57,11 +58,15 @@ class EMG_Decomposition():
                     self.emg_obj.decomp_dict['CoVs'] = [None]*(nwins)
                     
                     self.emg_obj.decomp_dict['SILs'] = np.zeros([nwins,self.emg_obj.its]) 
+
+                    
                     
                 #################### Convolutional Sphering ########################################
+                    print('starting convul')
                     self.emg_obj.convul_sphering(g,interval,tracker) #signal extension & whitening
                     
                 #################### FAST ICA ########################################
+                    print('starting ICA')
                     self.emg_obj.fast_ICA_and_CKC(g,interval,tracker) # find the weight vector using the FPA and source improvement
                     
         ##################### POSTPROCESSING #################################
@@ -69,7 +74,8 @@ class EMG_Decomposition():
                 self.emg_obj.decomp_dict['pulse_trains'] = [None]*(nwins)
                 self.emg_obj.decomp_dict['discharge_times'] = [None]*(nwins)
                 self.emg_obj.decomp_dict['IPTS'] = [None]*(nwins)
-                
+
+                print('post_processing')                
                 self.emg_obj.post_process_EMG(g, tracker) # g and tracker are unncessary! remove  
                 tracker = tracker + 1 #to the next grid!! -> makes more sense to do that first and than post_process EMG 
 
@@ -77,5 +83,5 @@ class EMG_Decomposition():
         print('Saving data')
 
         # self.emg_obj.save_EMG_decomposition(g,tracker)
-        self.emg_obj.save_EMG_decomposition(g,tracker, interval) #g and tracker are unused 
+        self.emg_obj.save_EMG_decomposition(g,tracker) #g and tracker are unused 
         print('Data saved')

@@ -17,7 +17,7 @@ from EditMU import EditMU
 grid_type = '4-8-L'
 
 
-#filepath = filedialog.askopenfilename(title = 'Select data file', filetypes = (('data-file (.poly5)', '*.poly5'),('All files', '*.*')),initialdir=measurements_dir)
+#filepath = filedialog.askopenfilename(title='Select data file', filetypes=(('Data files (.poly5, .xdf)', '*.poly5 *.xdf'),('All files', '*.*')), initialdir=measurements_dir)
 """
 if filepath == '':
     print("No file selected. Exiting the script.")
@@ -45,16 +45,18 @@ data_object.plot(scalings=dict(eeg = 250e-6), start= 0, duration = 5, n_channels
 ### DECOMPOSE FILE
 
 print('START OFFLINE DECOMPOSITION')
-offline_decomp = EMG_Decomposition(filepath=filepath, rejected_chan=EMG_reject)
+offline_decomp = EMG_Decomposition(filepath=filepath)
 offline_decomp.run(grid_name=grid_type)
 filepath_decomp = offline_decomp.emg_obj.file_path_json
 print("OFFLINE DECOMPOSITION DONE")
 #"""
 
 ### DISPLAY DECOMPOSED MOTOR UNITS AND EDIT PEAKS
-#emgfile = filepath_decomp
-emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\Pre_25_b.json')
+#emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\training_measurement-20240611_085328_decomp.json')
+emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\training_20240611_085441_decomp.json')
+#emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\Pre_25_b.json')
 
+#emgfile = emg.emg_from_json(filepath_decomp)
 emgfile = emg.sort_mus(emgfile)
-plotter = EditMU(emgfile)
+mu_editor = EditMU(emgfile)
 

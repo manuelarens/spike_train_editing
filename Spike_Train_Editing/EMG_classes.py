@@ -30,7 +30,7 @@ class EMG():
     def __init__(self):
         # processing settings
         self.its = 150 # number of iterations of the fixed point algorithm 
-        self.ref_exist = 0 # Boolean for whether an existing reference is used for signal batching (otherwise, manual selection)
+        self.ref_exist = 1 # Boolean for whether an existing reference is used for signal batching (otherwise, manual selection)
         self.windows = 1  # number of segmented windows over each contraction
         self.check_emg = 0 # Boolean for the review process of EMG channels, where 0 = Automatic selection 1 = Visual checking
         self.drawing_mode = 0 # 0 = Output in the command window ; 1 = Output in a figure
@@ -123,6 +123,7 @@ class offline_EMG(EMG):
                 self.ch_names = data.ch_names
                 self.sample_rate = data.info['sfreq']
                 self.num_channels = len(self.ch_names)
+                
             elif not self.filepath_poly5_xdf:
                 tk.messagebox.showerror(title='No file selected', message = 'No data file selected.')
 
@@ -134,12 +135,13 @@ class offline_EMG(EMG):
 
         fsamp = int(self.sample_rate)
         channels = self.ch_names
-        print(channels[1:-4])
+        print(channels[1:-3])
         nchans = len(channels)
         ngrids = 1
 
         # read in the EMG trial data
-        emg_data = self.samples[1:-4,:]
+        emg_data = self.samples[1:-3,:]
+        print(emg_data.shape)
         # create a dictionary containing all relevant signal parameters and data
         signal = dict(data = emg_data, fsamp = fsamp, nchans = nchans, ngrids = ngrids,grids = grid_names[:ngrids],muscles = muscle_names[:ngrids]) # discard the other muscle and grid entries, not relevant
 
@@ -397,7 +399,6 @@ class offline_EMG(EMG):
             chans_per_grid = (self.r_maps[i] * self.c_maps[i]) #aangepast
             
             for interval in range(n_intervals):
-                print(grid*chans_per_grid)
                 #the data slice is the slice of 1 grid, only where the threshold of the target is reached 
                 data_slice = self.signal_dict['data'][chans_per_grid*(grid-1):grid*chans_per_grid, int(self.plateau_coords[interval*2]):int(self.plateau_coords[(interval+1)*2-1])+1]
                 rejected_channels_slice = self.rejected_channels[i,:] == 1
@@ -669,6 +670,7 @@ class offline_EMG(EMG):
             self.decomp_dict['discharge_times'][g] = discharge_times_new
             self.decomp_dict['SILs'] = [None] * np.shape(self.decomp_dict['pulse_trains'][g])[0] #placeholder 
             self.dict['BINARY_MUS_FIRING'] = binary_spike_trains
+            self.discharge_times = discharge_times_new
             
             Z = np.array(self.decomp_dict['whitened_obvs'][0]).copy()
             
@@ -800,7 +802,7 @@ class offline_EMG(EMG):
             self.dict["REF_SIGNAL"] = pd.DataFrame(self.signal_dict['path'])
             self.dict["ACCURACY"] = pd.DataFrame(self.decomp_dict['SILs'])
             self.dict["IPTS"] = pd.DataFrame(self.decomp_dict['pulse_trains'][0]).T
-            self.dict["MUPULSES"] = [np.array(item) for item in self.discharge_times]
+            self.dict["MUPULSES"] = [list(item) for item in self.decomp_dict['discharge_times']]
             self.dict["FSAMP"] = float(self.signal_dict['fsamp'])
             self.dict["IED"] = float(self.ied)
             self.dict["centroids"] = pd.DataFrame(self.decomp_dict["centroids"])
@@ -831,10 +833,7 @@ class offline_EMG(EMG):
 
             # Every array has to be converted in a list; then, the list of lists
             # can be converted to json.
-            mupulses = []
-            for ind, array in enumerate(self.dict["MUPULSES"]):
-                mupulses.insert(ind, array.tolist())
-            mupulses = json.dumps(mupulses)
+            mupulses = json.dumps(self.dict["MUPULSES"])
 
             # Convert a dict of json objects to json. The result of the conversion
             # will be saved as the final json file.

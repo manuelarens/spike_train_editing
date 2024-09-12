@@ -6,6 +6,7 @@ _docs/build/
 Output/
 measurements/*
 !measurements/.gitkeep
+!measurements/training_measurement-20240611_085328.poly5
 __*.*
 !index.txt
 !__init__.py
