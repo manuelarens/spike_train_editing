@@ -53,7 +53,7 @@ from TMSiGui.gui import Gui
 from TMSiPlotterHelpers.impedance_plotter_helper import ImpedancePlotterHelper
 from TMSiPlotterHelpers.heatmap_plotter_helper import HeatmapPlotterHelper
 
-from .offline_EMG import EMG_Decomposition
+from .EMG_Decomposition import EMG_Decomposition
 from .force_feedback_plotter_helper import ForceFeedbackPlotterHelper
 
 try:

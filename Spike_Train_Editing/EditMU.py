@@ -3,6 +3,7 @@ from matplotlib.widgets import Button, RectangleSelector
 import seaborn as sns
 import pandas as pd
 import numpy as np
+import time
 
 from openhdemg.library.mathtools import compute_sil
 from openhdemg.library.plotemg import showgoodlayout
@@ -156,6 +157,7 @@ class EditMU:
     def add_buttons(self):
         # Storing the button objects as class attributes to prevent garbage collection
         self.button_color = "ivory"
+        self.button_active_color = "mistyrose"
 
         # Previous MU
         ax_prev = plt.axes([0.01, 0.025, 0.12, 0.04])
@@ -197,7 +199,7 @@ class EditMU:
             # Add RectangleSelector
             self.rect_selector_add.set_active(True)
             self.add_spikes_boolean = True
-            self.btn_add.color = "mistyrose"
+            self.btn_add.color = self.button_active_color
             self.fig.canvas.draw_idle()
         else:
             self.disconnect_buttons()
@@ -212,7 +214,7 @@ class EditMU:
 
             self.rect_selector_remove.set_active(True)
             self.remove_spikes_boolean = True
-            self.btn_remove.color = "mistyrose"
+            self.btn_remove.color = self.button_active_color
             self.fig.canvas.draw_idle()
         else:
             self.disconnect_buttons()
@@ -233,7 +235,6 @@ class EditMU:
             self.current_index -= 1
             self.plot_current_mu()
             self.fig.canvas.draw_idle()
-            self.disconnect_buttons()
             self.disconnect_buttons()
             
 
@@ -327,7 +328,10 @@ class EditMU:
                     break  # Exit after removing the peak
     
     def recalc_filter(self, event):
-        return
+        self.disconnect_buttons()
+        self.btn_recalc.color = self.button_active_color
+        time.sleep(1.5)
+        self.btn_recalc.color = self.button_color
 
     def add_instructions(self):
         instructions = (

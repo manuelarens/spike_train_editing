@@ -20,11 +20,7 @@ class EMG_Decomposition():
         self.emg_obj.convert_poly5_xdf(grid_names=[grid_name], muscle_names=['TA'])# adds signal_dict to the self.emg_obj, using Matlab output of ISpin 
         self.emg_obj.grid_formatter() # adds spatial context
 
-        if self.emg_obj.check_emg: # if you want to check the signal quality, perform channel rejection
-            # TODO: check, NOT CHECKED YET 
-            self.emg_obj.manual_rejection()
-
-        #################### BATCHING #######################################
+                #################### BATCHING #######################################
         if self.emg_obj.ref_exist: # if you want to use the target path to segment the EMG signal, to isolate the force plateau
             self.emg_obj.batch_w_target()
         else:

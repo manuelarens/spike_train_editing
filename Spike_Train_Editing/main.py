@@ -10,15 +10,15 @@ import openhdemg.library as emg
 
 from tkinter import filedialog 
 
-from offline_EMG import EMG_Decomposition
+from EMG_Decomposition import EMG_Decomposition
 from TMSiFileFormats.file_readers import Poly5Reader, Xdf_Reader, Edf_Reader
 from EditMU import EditMU
 
 grid_type = '4-8-L'
 
 
-filepath = filedialog.askopenfilename(title = 'Select data file', filetypes = (('data-file (.poly5)', '*.poly5'),('All files', '*.*')),initialdir=measurements_dir)
-#"""
+#filepath = filedialog.askopenfilename(title = 'Select data file', filetypes = (('data-file (.poly5)', '*.poly5'),('All files', '*.*')),initialdir=measurements_dir)
+"""
 if filepath == '':
     print("No file selected. Exiting the script.")
     sys.exit()  # Exit the script
@@ -54,7 +54,6 @@ print("OFFLINE DECOMPOSITION DONE")
 ### DISPLAY DECOMPOSED MOTOR UNITS AND EDIT PEAKS
 #emgfile = filepath_decomp
 emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\Pre_25_b.json')
-#print(emgfile["SOURCE"])
 
 emgfile = emg.sort_mus(emgfile)
 plotter = EditMU(emgfile)
