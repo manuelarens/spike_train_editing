@@ -52,11 +52,11 @@ print("OFFLINE DECOMPOSITION DONE")
 #"""
 
 ### DISPLAY DECOMPOSED MOTOR UNITS AND EDIT PEAKS
-#emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\training_measurement-20240611_085328_decomp.json')
-emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\training_20240611_085441_decomp.json')
-#emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\Pre_25_b.json')
+emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\training_measurement-20240611_085328_decomp.json') #own decomp
+#emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\training_20240611_085441_decomp.json') #tmsi decomp
+#emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interface-main\tmsi-python-interface-main\measurements\Pre_25_b.json') #openhdemg decomp
 
 #emgfile = emg.emg_from_json(filepath_decomp)
-emgfile = emg.sort_mus(emgfile)
-mu_editor = EditMU(emgfile)
-
+#emgfile = emg.sort_mus(emgfile)
+#emg.plot_mupulses(emgfile)
+#mu_editor = EditMU(emgfile)

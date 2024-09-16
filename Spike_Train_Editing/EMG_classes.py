@@ -29,7 +29,7 @@ class EMG():
     
     def __init__(self):
         # processing settings
-        self.its = 150 # number of iterations of the fixed point algorithm 
+        self.its = 50 # number of iterations of the fixed point algorithm 
         self.ref_exist = 1 # Boolean for whether an existing reference is used for signal batching (otherwise, manual selection)
         self.windows = 1  # number of segmented windows over each contraction
         self.check_emg = 0 # Boolean for the review process of EMG channels, where 0 = Automatic selection 1 = Visual checking
@@ -646,6 +646,7 @@ class offline_EMG(EMG):
             # maxlag = round(fsamp)/40
             # jitter = 0.0025
             pulse_trains, discharge_times_new, MU_filters_new = remove_duplicates(self.decomp_dict['MU_filters'], pulse_trains, discharge_times, discharge_times_aligned, round(self.signal_dict['fsamp']/40), 0.00025, self.signal_dict['fsamp'], self.dup_thr)
+            print(np.shape(MU_filters_new))
             self.decomp_dict['MU_filters'][0] = MU_filters_new
 
             # if we want further automatic refinement of MUs, prior to manual edition
@@ -671,6 +672,7 @@ class offline_EMG(EMG):
             self.decomp_dict['SILs'] = [None] * np.shape(self.decomp_dict['pulse_trains'][g])[0] #placeholder 
             self.dict['BINARY_MUS_FIRING'] = binary_spike_trains
             self.discharge_times = discharge_times_new
+            self.mu_filters = MU_filters_new
             
             Z = np.array(self.decomp_dict['whitened_obvs'][0]).copy()
             
@@ -738,6 +740,7 @@ class offline_EMG(EMG):
         self.dict["NUMBER_OF_MUS"] = np.shape(self.decomp_dict['pulse_trains'][0])[0]
         # self.dict["EXTRAS"] = pd.DataFrame(columns=[0])
         self.dict["EXTRAS"] = pd.DataFrame(self.signal_dict['target'])
+        self.dict["MU_filters"] = self.mu_filters.tolist()
         
         # based on the function 
         source = json.dumps(self.dict["SOURCE"])
@@ -763,6 +766,8 @@ class offline_EMG(EMG):
             mupulses.insert(ind, array.tolist())
         mupulses = json.dumps(mupulses)
 
+        MU_filters = json.dumps(self.dict["MU_filters"]) 
+
         # Convert a dict of json objects to json. The result of the conversion
         # will be saved as the final json file.
         emgfile = {
@@ -779,6 +784,7 @@ class offline_EMG(EMG):
             "NUMBER_OF_MUS": number_of_mus,
             "BINARY_MUS_FIRING": binary_mus_firing,
             "EXTRAS": extras,
+            "MU_filters": MU_filters,
         }
 
         # Compress and write the json file
