@@ -7,6 +7,7 @@ import time
 
 from openhdemg.library.mathtools import compute_sil
 from openhdemg.library.plotemg import showgoodlayout
+from recalc_filter import recalc_filter
  
 
 class EditMU:
@@ -330,7 +331,25 @@ class EditMU:
     def recalc_filter(self, event):
         self.disconnect_buttons()
         self.btn_recalc.color = self.button_active_color
-        time.sleep(1.5)
+        
+        emg_obj = recalc_filter()
+        
+        EMG = EMG(app.MUedition.signal.EMGmask{str2double(C{2})}==0,idx)
+        EMG = bandpassingals(EMG, app.MUedition.signal.fsamp, app.MUedition.signal.emgtype(str2double(C{2})))
+        spikes1 = intersect(idx(round(0.1*app.MUedition.signal.fsamp):end-round(0.1*app.MUedition.signal.fsamp)),app.MUedition.edition.Dischargetimes{str2double(C{2}),str2double(C{4})})
+        spikes2 = (spikes1 - idx(1))
+        exFactor1 = round(nbextchan/size(EMG,1))
+        eSIG = extend(EMG,exFactor1)
+        ReSIG = eSIG*eSIG'/length(eSIG)
+        iReSIGt = pinv(ReSIG)
+        [E, D] = pcaesig(eSIG)
+        [wSIG, ~, dewhiteningMatrix] = whiteesig(eSIG, E, D)
+        MUFilters = sum(wSIG(:,spikes2),2)
+
+
+
+
+
         self.btn_recalc.color = self.button_color
 
     def add_instructions(self):
