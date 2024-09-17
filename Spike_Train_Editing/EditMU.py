@@ -8,6 +8,7 @@ import time
 from openhdemg.library.mathtools import compute_sil
 from openhdemg.library.plotemg import showgoodlayout
 from recalc_filter import recalc_filter
+from processing_tools import *
  
 
 class EditMU:
@@ -329,24 +330,46 @@ class EditMU:
                     break  # Exit after removing the peak
     
     def recalc_filter(self, event):
+        
         self.disconnect_buttons()
         self.btn_recalc.color = self.button_active_color
-        
+
         emg_obj = recalc_filter()
         
-        EMG = EMG(app.MUedition.signal.EMGmask{str2double(C{2})}==0,idx)
-        EMG = bandpassingals(EMG, app.MUedition.signal.fsamp, app.MUedition.signal.emgtype(str2double(C{2})))
-        spikes1 = intersect(idx(round(0.1*app.MUedition.signal.fsamp):end-round(0.1*app.MUedition.signal.fsamp)),app.MUedition.edition.Dischargetimes{str2double(C{2}),str2double(C{4})})
-        spikes2 = (spikes1 - idx(1))
-        exFactor1 = round(nbextchan/size(EMG,1))
-        eSIG = extend(EMG,exFactor1)
-        ReSIG = eSIG*eSIG'/length(eSIG)
-        iReSIGt = pinv(ReSIG)
-        [E, D] = pcaesig(eSIG)
-        [wSIG, ~, dewhiteningMatrix] = whiteesig(eSIG, E, D)
-        MUFilters = sum(wSIG(:,spikes2),2)
+        emg_obj.convert_dict(self.emgfile, grid_names=['4-8-L'])# adds signal_dict to the emg_obj, using Matlab output of ISpin
+        emg_obj.grid_formatter() # adds spatial context
 
+                #################### BATCHING #######################################
+        if emg_obj.ref_exist: # if you want to use the target path to segment the EMG signal, to isolate the force plateau
+            emg_obj.batch_w_target()
+        else:
+            # TODO: check, NOT CHECKED YET 
+            emg_obj.batch_wo_target() # if you don't have one, batch without the target path
 
+        print(np.shape(emg_obj.signal_dict['batched_data']))
+        
+        spikes = [arr - emg_obj.plateau_coords[0][0] for arr in self.emgfile["MUPULSES"]]
+        extension_factor = int(np.round(emg_obj.ext_factor/len(emg_obj.signal_dict['batched_data'][0])))
+        eSIG = extend_emg(emg_obj.signal_dict['extend_obvs_old'][0], emg_obj.signal_dict['batched_data'][0], extension_factor)
+        ReSIG = emg_obj.signal_dict['eSIG']*emg_obj.signal_dict['eSIG']
+        iReSIGt = np.linalg.pinv(ReSIG)
+        [E, D] = emg_obj.pcaesig(eSIG)
+        wSIG, _, dewhiteningMatrix = emg_obj.whiteesig(eSIG, E, D)
+        wSIG_selected = wSIG[:, spikes]
+        MUFilters = np.sum(wSIG_selected, axis=1)
+
+        Pt = ((dewhiteningMatrix @ MUFilters).T @ iReSIGt) @ eSIG
+        Pt = Pt[:len(emg_obj.signal_dict['batched_data'][0])]  # Keep the size same as the original EMG signal
+
+        Pt[:round(0.1 * emg_obj.sample_rate)] = 0
+        Pt[-round(0.1 * emg_obj.sample_rate):] = 0
+        Pt = Pt * np.abs(Pt)
+
+        if len(spikes) >= 10:
+            Pt = Pt / np.mean(np.partition(Pt[spikes], -10)[-10:])
+
+        self.emgfile["IPTS"] = pd.DataFrame(Pt)
+        self.plot_current_mu()
 
 
 

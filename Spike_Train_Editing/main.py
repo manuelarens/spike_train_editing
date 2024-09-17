@@ -59,4 +59,4 @@ emgfile = emg.emg_from_json(r'C:\Manuel\Uni\Master\Stage\Code\tmsi-python-interf
 #emgfile = emg.emg_from_json(filepath_decomp)
 #emgfile = emg.sort_mus(emgfile)
 #emg.plot_mupulses(emgfile)
-#mu_editor = EditMU(emgfile)
+mu_editor = EditMU(emgfile)
