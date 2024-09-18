@@ -339,21 +339,14 @@ class EditMU:
         emg_obj.convert_dict(self.emgfile, grid_names=['4-8-L'])# adds signal_dict to the emg_obj, using Matlab output of ISpin
         emg_obj.grid_formatter() # adds spatial context
 
-                #################### BATCHING #######################################
-        if emg_obj.ref_exist: # if you want to use the target path to segment the EMG signal, to isolate the force plateau
-            emg_obj.batch_w_target(self.emgfile["MUPULSES"])
-        else:
-            # TODO: check, NOT CHECKED YET 
-            emg_obj.batch_wo_target() # if you don't have one, batch without the target path
-
-        print(f'batched data shape: {np.shape(emg_obj.signal_dict["batched_data"])}')
-        extension_factor = int(np.round(emg_obj.ext_factor/len(emg_obj.signal_dict['batched_data'][0])))
-        emg_obj.signal_dict['extend_obvs_old'] = np.zeros([1, np.shape(emg_obj.signal_dict['batched_data'][0])[0]*(extension_factor), np.shape(emg_obj.signal_dict['batched_data'][0])[1] + extension_factor -1 - emg_obj.differential_mode ])
+        emg = emg_obj.signal_dict["data"]
+        extension_factor = int(np.round(emg_obj.ext_factor/len(emg)))
+        emg_obj.signal_dict['extend_obvs_old'] = np.zeros([1, np.shape(emg)[0]*(extension_factor), np.shape(emg)[1] + extension_factor -1 - emg_obj.differential_mode ])
         
-        spikes = np.array(emg_obj.signal_dict["batched_mupulses"][self.current_index] - emg_obj.plateau_coords[0]).flatten()
+        spikes = self.emgfile["MUPULSES"][self.current_index]
         print (f"shape spikes = {np.shape(spikes)}")
         
-        eSIG = extend_emg(emg_obj.signal_dict['extend_obvs_old'][0], emg_obj.signal_dict['batched_data'][0], extension_factor)
+        eSIG = extend_emg(emg_obj.signal_dict['extend_obvs_old'][0], emg, extension_factor)
         
         ReSIG = np.matmul(eSIG,eSIG.transpose())/len(eSIG)
         iReSIGt = np.linalg.pinv(ReSIG)
@@ -366,20 +359,24 @@ class EditMU:
         MUFilters = np.sum(wSIG_selected, axis=1)
 
         Pt = ((dewhiteningMatrix @ MUFilters).T @ iReSIGt) @ eSIG
-        Pt = Pt[:len(emg_obj.signal_dict['batched_data'][0])]  # Keep the size same as the original EMG signal
+        print (f"shape Pt = {np.shape(Pt)}")
+        Pt = Pt[:len(emg[0])]  # Keep the size same as the original EMG signal
+        print (f"shape Pt = {np.shape(Pt)}, len emg = {len(emg[0])}")
 
         Pt[:round(0.1 * emg_obj.sample_rate)] = 0
         Pt[-round(0.1 * emg_obj.sample_rate):] = 0
+        print (f"shape Pt = {np.shape(Pt)}")
         Pt = Pt * np.abs(Pt)
         print(f"type pt = {type(Pt)}, shape pt = {Pt.shape}")
 
         #if len(spikes) >= 10:
         #    Pt = Pt / np.mean(np.partition(Pt[spikes], -10)[-10:])
 
-        self.emgfile["IPTS"][self.current_index] = Pt
+        self.emgfile["IPTS"][self.current_index] = np.pad(Pt, (0, 4))
         print ("Plotting new MU")
         self.plot_current_mu()
         self.fig.canvas.draw_idle()
+        print ("Ready for next edit")
 
 
 
