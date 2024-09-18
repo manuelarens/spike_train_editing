@@ -372,10 +372,14 @@ class recalc_filter(EMG):
         # TO DO: remove the assumption of the top LHC channel needing to be rejected
         self.rejected_channels = self.rejected_channels[:,1:] # get rid of the irrelevant top LHC channel
       
-    def batch_w_target(self): 
+    def batch_w_target(self, mupulses): 
         """use the EMG signal where the target value is higher than the threshold """
+           
         plateau = np.where(self.signal_dict['target'] >= max(self.signal_dict['target']) * self.plat_thr)[0] # find indices of the plateau threshold
-        discontinuity = np.where(np.diff(plateau) > 1)[0] # check if the plateau is reached in succeeding indices 
+        
+        
+        discontinuity = np.where(np.diff(plateau) > 1)[0] # check if the plateau is reached in succeeding indices
+        print(discontinuity)
         if self.windows > 1 and not discontinuity: 
         
             plat_len = plateau[-1] - plateau[0] # [-1]: last indix where plateau is reached
@@ -388,7 +392,7 @@ class recalc_filter(EMG):
 
             self.plateau_coords = batch
             
-        elif self.windows >= 1 and discontinuity.size > 0: #if discontinuity is not empty -> matlab r. 19
+        elif self.windows >= 1 and len(discontinuity) == 0: #if discontinuity is not empty -> matlab r. 19
             #difference with matlab: self.windows > 1 
             prebatch = np.zeros([len(discontinuity)+1,2]) 
             
@@ -403,7 +407,7 @@ class recalc_filter(EMG):
             plat_len = prebatch[:,-1] - prebatch[:,0] # difference between last and first column of each row 
             wind_len = np.floor(plat_len/self.windows)
             batch = np.zeros([len(discontinuity)+1,self.windows*2])
-            print(range(self.windows))
+            print(f'range windows = {range(self.windows)}')
             for i in range(self.windows):
                 
                 batch[:,i*2] = prebatch[:,0] + i*wind_len +1
@@ -411,6 +415,7 @@ class recalc_filter(EMG):
 
             batch = np.sort(batch.reshape([1, np.shape(batch)[0]*np.shape(batch)[1]]))
             self.plateau_coords = batch
+            print('plateau coordinates', batch/self.sample_rate)
             
         else:
             # the last option is having only one window and no discontinuity in the plateau; in that case, you leave as is
@@ -419,26 +424,47 @@ class recalc_filter(EMG):
             self.plateau_coords = batch
         
         # with the markers for windows and plateau discontinuities, batch the emg data ready for decomposition
+       # Batch the EMG data
         tracker = 0
-        n_intervals = (int(len(self.plateau_coords)/2))
+        n_intervals = int(len(self.plateau_coords) / 2)
         batched_data = [None] * (self.signal_dict['ngrids'] * n_intervals)
+        batched_mupulses = [None] * (self.signal_dict['ngrids'] * n_intervals)
 
         for i in range(int(self.signal_dict['ngrids'])):
-            
             grid = i + 1
-            chans_per_grid = (self.r_maps[i] * self.c_maps[i]) #aangepast
+            chans_per_grid = self.r_maps[i] * self.c_maps[i]
             
             for interval in range(n_intervals):
-                #the data slice is the slice of 1 grid, only where the threshold of the target is reached 
-                data_slice = self.signal_dict['data'][chans_per_grid*(grid-1):grid*chans_per_grid, int(self.plateau_coords[interval*2]):int(self.plateau_coords[(interval+1)*2-1])+1]
-                rejected_channels_slice = self.rejected_channels[i,:] == 1
+                # Slice the EMG data
+                data_slice = self.signal_dict['data'][chans_per_grid * (grid - 1):grid * chans_per_grid, int(self.plateau_coords[interval * 2]):int(self.plateau_coords[(interval + 1) * 2 - 1]) + 1]
+                rejected_channels_slice = self.rejected_channels[i, :] == 1
                 # Remove rejected channels
                 print(data_slice.shape)
                 print(rejected_channels_slice.shape)
                 batched_data[tracker] = np.delete(data_slice, rejected_channels_slice, 0)
-                tracker += 1
+                
+                mupulse_batch = []
+                for mupulse in mupulses:
+                    #print(f"interval: {interval}")
+                    start = int(self.plateau_coords[interval * 2])
+                    end = int(self.plateau_coords[(interval + 1) * 2 - 1]) + 1
+
+                    # Ensure start and end are within the bounds of the current mupulse
+                    start = max(start, mupulse[0])
+                    end = min(end, mupulse[-1])
+                    print(f'end = {end}')
+
+                    # Slice the 1D array to get the indices within the plateau
+                    sliced_mupulse = mupulse[(mupulse >= start) & (mupulse < end)]
+                    mupulse_batch.append(sliced_mupulse)
+
+                    batched_mupulses = mupulse_batch
+                    tracker += 1
+
+                    #print(f"Batched mupulses: {batched_mupulses}")
 
         self.signal_dict['batched_data'] = batched_data
+        self.signal_dict['batched_mupulses'] = batched_mupulses
         self.chans_per_grid = chans_per_grid    
 
     def batch_wo_target(self):
@@ -649,49 +675,6 @@ class recalc_filter(EMG):
 
         temp_MU_filters = None
         temp_CoVs = None
-
-    def pcaesig(signal):
-        """
-        Perform PCA on a row-wise signal and return the eigenvectors (E) and eigenvalues (D).
-
-        Args:
-            signal (numpy.ndarray): Input row-wise signal (channels x time points).
-
-        Returns:
-            E (numpy.ndarray): Matrix of eigenvectors (columns correspond to eigenvectors).
-            D (numpy.ndarray): Diagonal matrix of eigenvalues.
-        """
-        # Calculate the covariance matrix of the transposed signal (time points x channels)
-        covariance_matrix = np.cov(signal.T, bias=True)
-
-        # Perform eigenvalue decomposition
-        E, D = np.linalg.eig(covariance_matrix)
-
-        # Sort eigenvalues in descending order
-        eigenvalues = np.sort(np.diag(D))[::-1]
-        
-        # Calculate the rank tolerance (regularization factor) as the average of the smallest half of the eigenvalues
-        rank_tolerance = np.mean(eigenvalues[len(eigenvalues) // 2:])
-        
-        # If rank tolerance is negative, set it to 0
-        if rank_tolerance < 0:
-            rank_tolerance = 0
-        
-        # Determine the cutoff for significant eigenvalues
-        max_last_eig = np.sum(np.diag(D) > rank_tolerance)
-        
-        # If the number of significant eigenvalues is less than the number of channels
-        if max_last_eig < signal.shape[0]:
-            lower_limit_value = (eigenvalues[max_last_eig - 1] + eigenvalues[max_last_eig]) / 2
-        else:
-            lower_limit_value = eigenvalues[max_last_eig - 1]
-        
-        # Select eigenvectors and eigenvalues corresponding to significant eigenvalues
-        significant_indices = np.diag(D) > lower_limit_value
-        E = E[:, significant_indices]
-        D = np.diag(D)[significant_indices]
-        
-        return E, np.diag(D)
 
 
 ######################################## POST PROCESSING #####################################################
@@ -944,29 +927,4 @@ class recalc_filter(EMG):
             ) as f:
                 json.dump(emgfile, f)
 
-    def whiteesig(signal, E, D):
-        """
-        Whitens the EMG signal.
-
-        Parameters:
-        signal: ndarray
-            Row-wise signal (2D array where rows correspond to different channels).
-        E: ndarray
-            Full matrix whose columns are the corresponding eigenvectors.
-        D: ndarray
-            Diagonal matrix of eigenvalues.
-        
-        Returns:
-        whitensignals: ndarray
-            The whitened EMG signal.
-        whiteningMatrix: ndarray
-            The whitening matrix.
-        dewhiteningMatrix: ndarray
-            The dewhitening matrix.
-        """
-        
-        whiteningMatrix = E @ np.linalg.inv(np.sqrt(D)) @ E.T
-        dewhiteningMatrix = E @ np.sqrt(D) @ E.T
-        whitensignals = whiteningMatrix @ signal
-        
-        return whitensignals, whiteningMatrix, dewhiteningMatrix
+    

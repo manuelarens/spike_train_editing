@@ -32,6 +32,7 @@ class EMG_Decomposition():
         self.emg_obj.signal_dict['diff_data'] = [] #placeholder for the differential data 
         tracker = 0 # tracker corresponds the the grid number 
         nwins = int(len(self.emg_obj.plateau_coords)/2) # amount of force profiles to decompose
+        print(f'nwins = {nwins}')
         for g in range(int(self.emg_obj.signal_dict['ngrids'])): 
                 extension_factor = int(np.round(self.emg_obj.ext_factor/np.shape(self.emg_obj.signal_dict['batched_data'][tracker])[0])) # calculate extension factor using #EMGchannels 
                 # these two arrays are holding extended emg data PRIOR to the removal of edges

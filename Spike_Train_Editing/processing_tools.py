@@ -9,6 +9,7 @@ import sklearn
 from sklearn.metrics import silhouette_samples
 from sklearn.cluster import KMeans
 import numba
+from sklearn.decomposition import IncrementalPCA
 from numba import jit
 
 ##################################### FILTERING TOOLS #######################################################
@@ -298,6 +299,83 @@ def fixed_point_alg(w_n, B, Z,cf, dot_cf, its = 500,ortho_type='ord_deflation'):
         sep_diff[counter] = np.abs(w_n @ w_n_1 - 1) # calculate tolerance 
     print(counter)
     return w_n
+
+def pcaesig(signal):
+    """
+    Perform PCA on a row-wise signal and return the eigenvectors (E) and eigenvalues (D).
+
+    Args:
+        signal (numpy.ndarray): Input row-wise signal (channels x time points).
+
+    Returns:
+        E (numpy.ndarray): Matrix of eigenvectors (columns correspond to eigenvectors).
+        D (numpy.ndarray): Diagonal matrix of eigenvalues.
+    """
+    # Calculate the covariance matrix of the transposed signal (time points x channels)
+    covariance_matrix = np.cov(signal, bias=True)
+    print(f'shape cov = {covariance_matrix.shape}')
+
+    # Perform eigenvalue decomposition
+    eigenvalues, eigenvectors = np.linalg.eig(covariance_matrix)
+    print(f'shape eigenvalues = {eigenvalues.shape}')
+    print(f'shape eigenvectors = {eigenvectors.shape}')
+
+    # Sort eigenvalues and eigenvectors in descending order
+    sorted_indices = np.argsort(eigenvalues)[::-1]  # Indices for sorting in descending order
+    eigenvalues = eigenvalues[sorted_indices]
+    eigenvectors = eigenvectors[:, sorted_indices]
+
+    # Calculate the rank tolerance (regularization factor)
+    rank_tolerance = np.mean(eigenvalues[len(eigenvalues) // 2:])
+    
+    # If rank tolerance is negative, set it to 0
+    if rank_tolerance < 0:
+        rank_tolerance = 0
+    
+    # Determine the cutoff for significant eigenvalues
+    max_last_eig = np.sum(eigenvalues > rank_tolerance)
+    
+    if max_last_eig < signal.shape[0]:
+        lower_limit_value = (eigenvalues[max_last_eig - 1] + eigenvalues[max_last_eig]) / 2
+    else:
+        lower_limit_value = eigenvalues[max_last_eig - 1]
+    
+    # Select eigenvectors and eigenvalues corresponding to significant eigenvalues
+    significant_indices = eigenvalues > lower_limit_value
+    print(f'shape significant_indices = {significant_indices.shape}')
+    
+    # Select eigenvectors and eigenvalues
+    E = eigenvectors[:, significant_indices]
+    D = np.diag(eigenvalues[significant_indices])
+    
+    return E, D
+
+def whiteesig(signal, E, D):
+        """
+        Whitens the EMG signal.
+
+        Parameters:
+        signal: ndarray
+            Row-wise signal (2D array where rows correspond to different channels).
+        E: ndarray
+            Full matrix whose columns are the corresponding eigenvectors.
+        D: ndarray
+            Diagonal matrix of eigenvalues.
+        
+        Returns:
+        whitensignals: ndarray
+            The whitened EMG signal.
+        whiteningMatrix: ndarray
+            The whitening matrix.
+        dewhiteningMatrix: ndarray
+            The dewhitening matrix.
+        """
+        
+        whiteningMatrix = E @ np.linalg.inv(np.sqrt(D)) @ E.T
+        dewhiteningMatrix = E @ np.sqrt(D) @ E.T
+        whitensignals = whiteningMatrix @ signal
+        
+        return whitensignals, whiteningMatrix, dewhiteningMatrix
 
 # updadted get spikes on feb 19th 11:26am
 def get_spikes(w_n, Z, fsamp, std_thr = 3):
