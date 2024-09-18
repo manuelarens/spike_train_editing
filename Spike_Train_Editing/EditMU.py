@@ -113,8 +113,8 @@ class EditMU:
         self.add_instructions()
 
     def plot_peaks(self):
-        mu_pulses = self._process_mu_pulses(self.emgfile["MUPULSES"])
-        pulses = mu_pulses[self.current_index]
+        pulses = self._process_mu_pulses(self.emgfile["MUPULSES"])
+        pulses = pulses[self.current_index]
 
         self.peak_artists = []
         for pulse in pulses:
@@ -330,58 +330,73 @@ class EditMU:
                     break  # Exit after removing the peak
     
     def recalc_filter(self, event):
-        
         self.disconnect_buttons()
         self.btn_recalc.color = self.button_active_color
 
         emg_obj = recalc_filter()
-        
-        emg_obj.convert_dict(self.emgfile, grid_names=['4-8-L'])# adds signal_dict to the emg_obj, using Matlab output of ISpin
-        emg_obj.grid_formatter() # adds spatial context
+
+        # Recalculate the pulse train
+        self.recalc_pulse_train(emg_obj)
+
+        # Placeholder for recalculating peaks
+        self.recalc_peaks()
+
+        ###### plotting
+        print("Plotting new MU")
+        self.plot_current_mu()
+        self.fig.canvas.draw_idle()
+        print("Ready for next edit")
+
+        self.btn_recalc.color = self.button_color
+
+
+    def recalc_pulse_train(self, emg_obj):
+        """Recalculates the pulse train based on the current EMG signal and updates IPTS."""
+
+        emg_obj.convert_dict(self.emgfile, grid_names=['4-8-L'])  # adds signal_dict to the emg_obj, using Matlab output of ISpin
+        emg_obj.grid_formatter()  # adds spatial context
 
         emg = emg_obj.signal_dict["data"]
-        extension_factor = int(np.round(emg_obj.ext_factor/len(emg)))
-        emg_obj.signal_dict['extend_obvs_old'] = np.zeros([1, np.shape(emg)[0]*(extension_factor), np.shape(emg)[1] + extension_factor -1 - emg_obj.differential_mode ])
-        
+        extension_factor = int(np.round(emg_obj.ext_factor / len(emg)))
+        emg_obj.signal_dict['extend_obvs_old'] = np.zeros([1, np.shape(emg)[0] * extension_factor, np.shape(emg)[1] + extension_factor - 1 - emg_obj.differential_mode])
+
         spikes = self.emgfile["MUPULSES"][self.current_index]
-        print (f"shape spikes = {np.shape(spikes)}")
-        
+        print(f"shape spikes = {np.shape(spikes)}")
+
         eSIG = extend_emg(emg_obj.signal_dict['extend_obvs_old'][0], emg, extension_factor)
-        
-        ReSIG = np.matmul(eSIG,eSIG.transpose())/len(eSIG)
+
+        ReSIG = np.matmul(eSIG, eSIG.transpose()) / len(eSIG)
         iReSIGt = np.linalg.pinv(ReSIG)
         E, D = pcaesig(eSIG)
         wSIG, _, dewhiteningMatrix = whiteesig(eSIG, E, D)
-        print (f"shape esig = {np.shape(eSIG)}, shape iReSIGt = {np.shape(iReSIGt)}")
-        print (f"shape E = {np.shape(E)}, shape D = {np.shape(D)}")
-        print (f"shape wSIG = {np.shape(wSIG)}, shape dewhiteningMatrix = {np.shape(dewhiteningMatrix)}")
+        print(f"shape esig = {np.shape(eSIG)}, shape iReSIGt = {np.shape(iReSIGt)}")
+        print(f"shape E = {np.shape(E)}, shape D = {np.shape(D)}")
+        print(f"shape wSIG = {np.shape(wSIG)}, shape dewhiteningMatrix = {np.shape(dewhiteningMatrix)}")
         wSIG_selected = wSIG[:, spikes]
         MUFilters = np.sum(wSIG_selected, axis=1)
 
         Pt = ((dewhiteningMatrix @ MUFilters).T @ iReSIGt) @ eSIG
-        print (f"shape Pt = {np.shape(Pt)}")
-        Pt = Pt[:len(emg[0])]  # Keep the size same as the original EMG signal
-        print (f"shape Pt = {np.shape(Pt)}, len emg = {len(emg[0])}")
+        print(f"shape Pt = {np.shape(Pt)}")
+        Pt = Pt[:len(emg[0])]  # Keep the size the same as the original EMG signal
+        print(f"shape Pt = {np.shape(Pt)}, len emg = {len(emg[0])}")
 
         Pt[:round(0.1 * emg_obj.sample_rate)] = 0
         Pt[-round(0.1 * emg_obj.sample_rate):] = 0
-        print (f"shape Pt = {np.shape(Pt)}")
+        print(f"shape Pt = {np.shape(Pt)}")
         Pt = Pt * np.abs(Pt)
         print(f"type pt = {type(Pt)}, shape pt = {Pt.shape}")
 
-        #if len(spikes) >= 10:
-        #    Pt = Pt / np.mean(np.partition(Pt[spikes], -10)[-10:])
+        if len(spikes) >= 10:
+            Pt = Pt / np.mean(np.partition(Pt[spikes], -10)[-10:])
 
         self.emgfile["IPTS"][self.current_index] = np.pad(Pt, (0, 4))
-        print ("Plotting new MU")
-        self.plot_current_mu()
-        self.fig.canvas.draw_idle()
-        print ("Ready for next edit")
 
 
+    def recalc_peaks(self):
+        """Placeholder function for recalculating peaks."""
+        print("Recalculating peaks...")
 
 
-        self.btn_recalc.color = self.button_color
 
     def add_instructions(self):
         instructions = (
