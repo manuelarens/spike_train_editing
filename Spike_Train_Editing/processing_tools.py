@@ -313,13 +313,9 @@ def pcaesig(signal):
     """
     # Calculate the covariance matrix of the transposed signal (time points x channels)
     covariance_matrix = np.cov(signal, bias=True)
-    print(f'shape cov = {covariance_matrix.shape}')
 
     # Perform eigenvalue decomposition
     eigenvalues, eigenvectors = np.linalg.eig(covariance_matrix)
-    print(f'shape eigenvalues = {eigenvalues.shape}')
-    print(f'shape eigenvectors = {eigenvectors.shape}')
-
     # Sort eigenvalues and eigenvectors in descending order
     sorted_indices = np.argsort(eigenvalues)[::-1]  # Indices for sorting in descending order
     eigenvalues = eigenvalues[sorted_indices]
@@ -342,7 +338,6 @@ def pcaesig(signal):
     
     # Select eigenvectors and eigenvalues corresponding to significant eigenvalues
     significant_indices = eigenvalues > lower_limit_value
-    print(f'shape significant_indices = {significant_indices.shape}')
     
     # Select eigenvectors and eigenvalues
     E = eigenvectors[:, significant_indices]

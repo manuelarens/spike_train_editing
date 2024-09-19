@@ -46,6 +46,8 @@ class EditMU:
         # Initialize the current MU index
         self.current_index = 0
 
+        self.peak_artists = []
+
         # Create plot
         self.fig, self.ax1 = plt.subplots(
             figsize=(figsize[0] / 2.54, figsize[1] / 2.54), num="IPTS"
@@ -121,12 +123,21 @@ class EditMU:
         pulses = self._process_mu_pulses(self.emgfile["MUPULSES"])
         pulses = pulses[self.current_index]
 
+        # Clear existing peak artists from the plot
+        if hasattr(self, 'peak_artists') and self.peak_artists:
+            for peak_artist in self.peak_artists:
+                peak_artist.remove()  # Remove each peak from the plot
+
+        # Reset the peak artists list
         self.peak_artists = []
+
+        # Plot each pulse as a red circle
         for pulse in pulses:
-            closest_idx = (np.abs(self.x_axis - pulse)).argmin()
-            y_value = self.ipts.iloc[closest_idx, self.current_index]
+            closest_idx = (np.abs(self.x_axis - pulse)).argmin()  # Find closest point on the x-axis
+            y_value = self.ipts.iloc[closest_idx, self.current_index]  # Get the y-value
             peak_artist, = self.ax1.plot(pulse, y_value, "ro", markersize=2, picker=True)  # Enable picking
             self.peak_artists.append(peak_artist)
+
 
     def zoom(self, event):
         current_xlim = self.ax1.get_xlim()
@@ -236,8 +247,6 @@ class EditMU:
         # Destroy the root window
         root.destroy()
         
-
-
     def add_spikes(self, event):
         if not self.add_spikes_boolean:
             # turn off other one
@@ -348,36 +357,41 @@ class EditMU:
         xmasked = self.x_axis[mask]
         ymasked = self.emgfile["IPTS"][self.current_index][mask]
 
+        # Initialize a deletion counter
+        delete_count = 0
+        max_deletions = 10  # Set maximum deletions to 10
+
         if len(xmasked) > 0:
-            # Find the point to remove
-            xmax = xmasked[np.argmax(ymasked)]  # x value of the max peak in the selected region
-            ymax = ymasked.max()  # y value of the max peak
-            
-            # Find the closest peak in self.peak_artists
-            for peak_artist in self.peak_artists:
-                peak_x, peak_y = peak_artist.get_data()  # Get (x, y) coordinates of the peak
-                peak_x, peak_y = peak_x[0], peak_y[0]  # Since it's a single point
+            # Loop through all selected peaks and remove them
+            for i, (xmax, ymax) in enumerate(zip(xmasked, ymasked)):
+                # Find the closest pulse (in samples) to remove
+                x_idx = int(xmax * self.fsamp)  # Convert xmax to sample index
+                pulses = self.emgfile["MUPULSES"][self.current_index]
+                index = np.searchsorted(pulses, x_idx)
+                if index < len(pulses) and pulses[index] == x_idx:  # Check if the index matches
+                    self.emgfile["MUPULSES"][self.current_index] = np.delete(pulses, index)
 
-                # If the peak matches the selected (xmax, ymax) point
-                if np.isclose(peak_x, xmax, atol=0.01) and np.isclose(peak_y, ymax, atol=0.01):
-                    # Remove the peak from the plot
-                    peak_artist.remove()
+                    # Increment the deletion counter
+                    delete_count += 1
+                    if delete_count >= max_deletions:
+                        # Stop if we have reached the maximum number of deletions
+                        print('Limit of 10 deletions at a time reached')
 
-                    # Find the corresponding peak in the emgfile and remove it
-                    x_idx = int(xmax * self.fsamp)  # Convert xmax to sample index
-                    pulses = self.emgfile["MUPULSES"][self.current_index]
-                    index = np.searchsorted(pulses, x_idx)
-                    if pulses[index] == x_idx:  # Check if the index matches
-                        self.emgfile["MUPULSES"][self.current_index] = np.delete(pulses, index)
+                        # Call the plot_peaks function to update the figure
+                        self.plot_peaks()
+                        self.fig.canvas.draw_idle()
+                        return
+                    
+            # Call the plot_peaks function to update the figure
+            self.plot_peaks()
+            self.fig.canvas.draw_idle()
 
-                    # Remove the artist from the list
-                    self.peak_artists.remove(peak_artist)
 
-                    # Redraw the plot to reflect the changes
-                    self.fig.canvas.draw_idle()
-                    break  # Exit after removing the peak
+
     
     def recalc_filter(self, event):
+        
+        print('Recalculating pulse train...')
         self.disconnect_buttons()
         self.btn_recalc.color = self.button_active_color
 
@@ -392,6 +406,7 @@ class EditMU:
         self.plot_current_mu()
         self.fig.canvas.draw_idle()
         print("Ready for next edit")
+        print('')
 
         self.btn_recalc.color = self.button_color
 
@@ -408,38 +423,27 @@ class EditMU:
         emg_obj.signal_dict['extend_obvs_old'] = np.zeros([1, np.shape(emg)[0] * extension_factor, np.shape(emg)[1] + extension_factor - 1 - emg_obj.differential_mode])
 
         spikes = self.emgfile["MUPULSES"][self.current_index]
-        print(f"shape spikes = {np.shape(spikes)}")
 
         eSIG = extend_emg(emg_obj.signal_dict['extend_obvs_old'][0], emg, extension_factor)
 
-        ReSIG = np.matmul(eSIG, eSIG.transpose()) / len(eSIG)
+        ReSIG = np.matmul(eSIG, eSIG.T) / len(eSIG)
         iReSIGt = np.linalg.pinv(ReSIG)
         E, D = pcaesig(eSIG)
         wSIG, _, dewhiteningMatrix = whiteesig(eSIG, E, D)
-        print(f"shape esig = {np.shape(eSIG)}, shape iReSIGt = {np.shape(iReSIGt)}")
-        print(f"shape E = {np.shape(E)}, shape D = {np.shape(D)}")
-        print(f"shape wSIG = {np.shape(wSIG)}, shape dewhiteningMatrix = {np.shape(dewhiteningMatrix)}")
         wSIG_selected = wSIG[:, spikes]
         MUFilters = np.sum(wSIG_selected, axis=1)
 
         Pt = ((dewhiteningMatrix @ MUFilters).T @ iReSIGt) @ eSIG
-        print(f"shape Pt = {np.shape(Pt)}")
         Pt = Pt[:len(emg[0])]  # Keep the size the same as the original EMG signal
-        print(f"shape Pt = {np.shape(Pt)}, len emg = {len(emg[0])}")
 
         Pt[:round(0.1 * emg_obj.sample_rate)] = 0
         Pt[-round(0.1 * emg_obj.sample_rate):] = 0
-        print(f"shape Pt = {np.shape(Pt)}")
         Pt = Pt * np.abs(Pt)
-        print(f"type pt = {type(Pt)}, shape pt = {Pt.shape}")
-
 
         min_peak_distance = round(emg_obj.sample_rate * 0.005)
-        spikes, _ = find_peaks(Pt, distance=min_peak_distance)
-        print(f'spikes = {spikes}')
+        spikes = detect_peaks(Pt, mpd = min_peak_distance)
 
-        if len(spikes) >= 10:
-            Pt = Pt / np.mean(np.partition(Pt[spikes], -10)[-10:])
+        Pt /=  np.mean(maxk(Pt, 10))
 
         self.emgfile["IPTS"][self.current_index] = np.pad(Pt, (0, 4))
         return spikes
@@ -450,33 +454,30 @@ class EditMU:
         """Recalculate peaks by applying k-means clustering and removing outliers."""
         
         # Access the current MU's pulse train and IPTS data
-        Pt = self.ipts[self.current_index]
+        Pt = self.emgfile["IPTS"][self.current_index]
         
         # Select the pulse values for clustering
         pulse_values = np.array(Pt[spikes])
-        print(f'shape pulse_values = {pulse_values.shape}')
         
         # Apply k-means clustering with 2 clusters
-        kmeans = KMeans(n_clusters=2, random_state=0)
-        L = kmeans.fit_predict(pulse_values.reshape(-1, 1))  # Reshape as kmeans expects 2D data
-        C2 = kmeans.cluster_centers_.flatten()
-        
-        # Find the cluster with the maximum centroid
-        idx2 = np.argmax(C2)
-        
-        # Select the spikes corresponding to the highest centroid cluster
-        spikes2 = spikes[L == idx2]
-        
+        kmeans = KMeans(n_clusters = 2, init = 'k-means++',n_init = 1).fit(pulse_values.reshape(-1,1)) # 2D array with 1 column
+
+        spikes_ind = np.argmax(kmeans.cluster_centers_) # Determine highest centroid
+        # fix below 
+        spikes2 = spikes[np.where(kmeans.labels_ == spikes_ind)]
+                
         # Remove outliers: spikes where the pulse values are greater than mean + 3*std
+        """
         mean_val = np.mean(Pt[spikes2])
         std_val = np.std(Pt[spikes2])
-        threshold = mean_val + 3 * std_val
-        spikes2 = spikes2[Pt[spikes2] <= threshold]
+        self.threshold = mean_val + 3 * std_val
+        spikes2 = spikes2[Pt[spikes2] <= self.threshold]
+        #"""
         
         # Update MUPULSES with the filtered spikes
         self.emgfile["MUPULSES"][self.current_index] = spikes2
         
-        print("Recalculated peaks.")
+        
 
 
 
