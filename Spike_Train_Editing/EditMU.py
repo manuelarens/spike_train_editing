@@ -48,6 +48,12 @@ class EditMU:
 
         self.peak_artists = []
 
+        self.first_plot = [True] * len(emgfile['MUPULSES'])
+        self.sil_recalculated = [False] * len(emgfile['MUPULSES'])
+        self.sil_old = np.zeros(len(emgfile['MUPULSES']))
+        self.sil_new = np.zeros(len(emgfile['MUPULSES']))
+        self.sil_color = 'black'
+
         # Create plot
         self.fig, self.ax1 = plt.subplots(
             figsize=(figsize[0] / 2.54, figsize[1] / 2.54), num="IPTS"
@@ -102,19 +108,46 @@ class EditMU:
         self.ax1.plot(self.x_axis, self.ipts[self.current_index])
         self.ax1.set_ylabel(f"MU {self.current_index + 1}")
         self.plot_peaks()
-        sil_value = compute_sil(self.ipts[self.current_index], self.emgfile["MUPULSES"][self.current_index])
+        self.sil_new[self.current_index] = compute_sil(self.ipts[self.current_index], self.emgfile["MUPULSES"][self.current_index])
+
+        if self.first_plot[self.current_index] or not self.sil_recalculated[self.current_index]:
+            # If this is the first plot, make the SIL text color black
+            self.sil_color = 'black'
+            sil_dif_text = ""
+        else:
+            # Calculate the SIL difference
+            sil_dif = self.sil_new[self.current_index] - self.sil_old[self.current_index]
+            sil_dif_text = f'( Δ = {sil_dif:.4f})'
+
+            # Determine the SIL color based on the difference
+            if sil_dif > 0:
+                if sil_dif < 0.02:
+                    self.sil_color = 'limegreen'
+                else:
+                    self.sil_color = 'darkgreen'
+            elif sil_dif < 0:
+                if sil_dif > -0.02:
+                    self.sil_color = 'salmon'
+                else:
+                    self.sil_color = 'red'
+            else:
+                self.sil_color = 'black'
+                
+        self.sil_old[self.current_index] = self.sil_new[self.current_index]
 
         # Display SIL value
         self.ax1.text(
-            0.5,
+            0.39,
             1.05,
-            f"SIL = {sil_value:.6f}",
-            ha="center",
+            f"SIL = {self.sil_new[self.current_index]:.6f}{sil_dif_text}",
+            ha="left",
             va="center",
             transform=self.ax1.transAxes,
             fontsize=10,
             fontweight="bold",
+            color = self.sil_color,
         )
+
         self.ax1.set_xlabel("Time (Sec)" if self.timeinseconds else "Samples")
         # Add instructions
         self.add_instructions()
@@ -395,6 +428,11 @@ class EditMU:
         self.disconnect_buttons()
         self.btn_recalc.color = self.button_active_color
 
+        if len(self.emgfile["MUPULSES"][self.current_index]) == 0:
+            print('No pulses selected, please select pulses or delete MU')
+            return
+
+        self.first_plot[self.current_index] = False  # Set first_plot to False after the first plot
         # Recalculate the pulse train
         spikes = self.recalc_pulse_train()
 
@@ -403,8 +441,11 @@ class EditMU:
 
         ###### plotting
         print("Plotting new MU")
+        self.sil_recalculated[self.current_index] = True
         self.plot_current_mu()
         self.fig.canvas.draw_idle()
+        self.sil_recalculated[self.current_index] = False
+
         print("Ready for next edit")
         print('')
 
@@ -477,10 +518,6 @@ class EditMU:
         # Update MUPULSES with the filtered spikes
         self.emgfile["MUPULSES"][self.current_index] = spikes2
         
-        
-
-
-
     def add_instructions(self):
         instructions = (
             "Mouse Wheel: Zoom in/out\n"
