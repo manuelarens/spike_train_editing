@@ -4,11 +4,16 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 import time
+from scipy.signal import find_peaks
+import tkinter as tk
+from tkinter import messagebox
+
 
 from openhdemg.library.mathtools import compute_sil
 from openhdemg.library.plotemg import showgoodlayout
 from recalc_filter import recalc_filter
 from processing_tools import *
+
  
 
 class EditMU:
@@ -186,9 +191,52 @@ class EditMU:
         self.btn_recalc = Button(ax_recalc, "Recalc. filter", color=self.button_color)
         self.btn_recalc.on_clicked(self.recalc_filter)
 
-
+        ax_delete = plt.axes([0.85, 0.95, 0.14, 0.04])
+        self.btn_delete = Button(ax_delete, "Delete MU", color='tomato', hovercolor='salmon')
+        self.btn_delete.on_clicked(self.delete_MU)
 
         self.fig.canvas.draw_idle()  # Force canvas update after button creation
+
+    def delete_MU(self, event):
+        # Create a Tkinter root window (it will be hidden)
+        root = tk.Tk()
+        root.withdraw()  # Hide the root window
+
+        # Show a confirmation dialog
+        confirm = messagebox.askyesno(
+            "Confirm Deletion",
+            "Are you sure you want to delete this motor unit?",
+            icon='warning',  # Adds a warning icon to the dialog
+            parent=root
+        )
+
+        # Proceed with deletion only if the user clicks "Yes"
+        if confirm:
+            self.disconnect_buttons()
+
+            # Drop the column corresponding to the current index
+            self.emgfile['IPTS'].drop(columns=[self.current_index], inplace=True)
+            self.emgfile['IPTS'].columns = range(self.emgfile['IPTS'].shape[1])
+
+            # Remove the motor unit pulses at the current index
+            del self.emgfile['MUPULSES'][self.current_index]
+
+            # Update the current index to the last valid motor unit
+            if self.current_index >= len(self.emgfile['MUPULSES']):
+                self.current_index = len(self.emgfile['MUPULSES']) - 1
+                if self.current_index == -1:
+                    print("No MU's remaining, closing script")
+                    plt.close(self.fig)
+
+            # Plot the current MU if there are any left
+            if self.current_index >= 0:
+                self.plot_current_mu()
+                self.fig.canvas.draw_idle()
+
+        # Destroy the root window
+        root.destroy()
+        
+
 
     def add_spikes(self, event):
         if not self.add_spikes_boolean:
@@ -241,7 +289,7 @@ class EditMU:
             
 
     def next_mu(self, event):
-        if self.current_index < self.emgfile["NUMBER_OF_MUS"] - 1:
+        if self.current_index < len(self.emgfile["IPTS"].columns) - 1:
             self.current_index += 1
             self.plot_current_mu()
             self.fig.canvas.draw_idle()
@@ -333,13 +381,11 @@ class EditMU:
         self.disconnect_buttons()
         self.btn_recalc.color = self.button_active_color
 
-        emg_obj = recalc_filter()
-
         # Recalculate the pulse train
-        self.recalc_pulse_train(emg_obj)
+        spikes = self.recalc_pulse_train()
 
         # Placeholder for recalculating peaks
-        self.recalc_peaks()
+        self.recalc_peaks(spikes)
 
         ###### plotting
         print("Plotting new MU")
@@ -350,8 +396,9 @@ class EditMU:
         self.btn_recalc.color = self.button_color
 
 
-    def recalc_pulse_train(self, emg_obj):
+    def recalc_pulse_train(self):
         """Recalculates the pulse train based on the current EMG signal and updates IPTS."""
+        emg_obj = recalc_filter()
 
         emg_obj.convert_dict(self.emgfile, grid_names=['4-8-L'])  # adds signal_dict to the emg_obj, using Matlab output of ISpin
         emg_obj.grid_formatter()  # adds spatial context
@@ -386,15 +433,50 @@ class EditMU:
         Pt = Pt * np.abs(Pt)
         print(f"type pt = {type(Pt)}, shape pt = {Pt.shape}")
 
+
+        min_peak_distance = round(emg_obj.sample_rate * 0.005)
+        spikes, _ = find_peaks(Pt, distance=min_peak_distance)
+        print(f'spikes = {spikes}')
+
         if len(spikes) >= 10:
             Pt = Pt / np.mean(np.partition(Pt[spikes], -10)[-10:])
 
         self.emgfile["IPTS"][self.current_index] = np.pad(Pt, (0, 4))
+        return spikes
 
 
-    def recalc_peaks(self):
-        """Placeholder function for recalculating peaks."""
-        print("Recalculating peaks...")
+    def recalc_peaks(self, spikes):
+            
+        """Recalculate peaks by applying k-means clustering and removing outliers."""
+        
+        # Access the current MU's pulse train and IPTS data
+        Pt = self.ipts[self.current_index]
+        
+        # Select the pulse values for clustering
+        pulse_values = np.array(Pt[spikes])
+        print(f'shape pulse_values = {pulse_values.shape}')
+        
+        # Apply k-means clustering with 2 clusters
+        kmeans = KMeans(n_clusters=2, random_state=0)
+        L = kmeans.fit_predict(pulse_values.reshape(-1, 1))  # Reshape as kmeans expects 2D data
+        C2 = kmeans.cluster_centers_.flatten()
+        
+        # Find the cluster with the maximum centroid
+        idx2 = np.argmax(C2)
+        
+        # Select the spikes corresponding to the highest centroid cluster
+        spikes2 = spikes[L == idx2]
+        
+        # Remove outliers: spikes where the pulse values are greater than mean + 3*std
+        mean_val = np.mean(Pt[spikes2])
+        std_val = np.std(Pt[spikes2])
+        threshold = mean_val + 3 * std_val
+        spikes2 = spikes2[Pt[spikes2] <= threshold]
+        
+        # Update MUPULSES with the filtered spikes
+        self.emgfile["MUPULSES"][self.current_index] = spikes2
+        
+        print("Recalculated peaks.")
 
 
 
