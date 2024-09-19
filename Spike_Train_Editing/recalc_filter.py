@@ -1,27 +1,8 @@
-import glob, os, scipy
-import xml.etree.ElementTree as ET
-import tarfile as tf
 import numpy as np
-import matplotlib.pyplot as plt
 from processing_tools import *
 import tkinter as tk
-from tkinter import simpledialog
-from tkinter import filedialog 
-
-from scipy import signal
-from scipy import io
-import time
-from tqdm import tqdm
-import pandas as pd 
-import json 
 import tkinter as tk
-import gzip 
-import os 
-from os.path import join, dirname, realpath 
-import sys
-from TMSiFileFormats.file_readers import Xdf_Reader
-from Test_Scripts_Nathan.poly5_force_file_reader import Poly5Reader
-# root = tk.Tk()
+
 np.random.seed(1337)
 
 
