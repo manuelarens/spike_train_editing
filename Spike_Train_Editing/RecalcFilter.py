@@ -1,7 +1,7 @@
 import numpy as np
+import tkinter as tk
 from processing_tools import *
-import tkinter as tk
-import tkinter as tk
+
 
 np.random.seed(1337)
 
@@ -37,7 +37,7 @@ class EMG():
 ########################################## OFFLINE EMG ################################################
 #######################################################################################################
 
-class recalc_filter(EMG):
+class RecalcFilter(EMG):
 
     # child class of EMG, so will inherit it's initialisaiton
     def __init__(self, to_filter= 0, rejected_chan = []):

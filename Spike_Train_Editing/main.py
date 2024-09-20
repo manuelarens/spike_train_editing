@@ -6,11 +6,14 @@ This script handles EMG data processing including:
 4. Editing motor unit peaks via an interactive interface.
 5. Saving the edited motor unit data back to a file.
 
-The script utilizes a custom `EditMU` class for peak editing.
+The script utilizes a custom `EditMU` class for Motor Unit editing.
 """
 
 import sys
 from os.path import join, dirname, realpath
+import numpy as np
+from tkinter import filedialog
+import openhdemg.library as emg
 
 # Define paths for modules and measurements directories
 EXAMPLE_DIR = dirname(realpath(__file__))  # Directory of this script file
@@ -19,13 +22,11 @@ MEASUREMENTS_DIR = join(EXAMPLE_DIR, '../measurements')  # Directory with all me
 sys.path.append(MODULES_DIR)  # Add modules directory to system path for importing custom modules
 
 # Now import the modules that depend on the path
-import numpy as np
-from tkinter import filedialog
-import openhdemg.library as emg
+from processing_tools import emg_from_json
 from EMG_Decomposition import EMG_Decomposition
 from TMSiFileFormats.file_readers import Poly5Reader
 from EditMU import EditMU
-from processing_tools import emg_from_json
+
 
 GRID_TYPE = '4-8-L'
 

@@ -16,11 +16,12 @@ from tkinter import messagebox
 import json
 import os
 import gzip
+from sklearn.cluster import KMeans
 
 from openhdemg.library.mathtools import compute_sil
 from openhdemg.library.plotemg import showgoodlayout
-from recalc_filter import recalc_filter
-from processing_tools import *
+from RecalcFilter import RecalcFilter
+from processing_tools import get_binary_pulse_trains, whiteesig, extend_emg, pcaesig, detect_peaks, maxk
 
 class EditMU:
     def __init__(
@@ -769,7 +770,7 @@ class EditMU:
             np.ndarray: Array of detected spikes based on the recalculated pulse train.
         """
         # Initialize EMG object and prepare the data
-        emg_obj = recalc_filter()
+        emg_obj = RecalcFilter()
 
         emg_obj.convert_dict(self.emgfile, grid_names=self.grid_name)  # Converts MATLAB output to EMG object format
         emg_obj.grid_formatter()  # Adds spatial context to the EMG object
@@ -892,57 +893,47 @@ class EditMU:
 
 
     def save_EMG_decomposition(self):
-        # adapted from OpenHDEMG, function save_to_json()
+        """
+        Saves the decomposed EMG data into a JSON file, compressing it using gzip.
+        The function adapts the 'save_to_json()' method from OpenHDEMG.
+
+        The saved file will contain details about the raw EMG signal, reference signal, 
+        accuracy, pulse trains (MUPULSES), binary motor unit firings, and other metadata.
+
+        The resulting JSON file is saved in the same folder as the input EMG file, 
+        and the filename is appended with '_edited'.
+        
+        Returns:
+            str: The file path of the saved JSON file.
+        """
+
+        # Define file paths and filenames
         savefolder = os.path.dirname(self.filepath)
-        base=os.path.basename(self.filepath) #get only the file+extension  
+        base = os.path.basename(self.filepath)  # Get only the file+extension
         filename = os.path.splitext(base)[0]
 
+        # Get the binary pulse trains
         binary_mus_firing = get_binary_pulse_trains(self.emgfile["MUPULSES"], self.emgfile['RAW_SIGNAL'].shape[0])
 
-        
+        # Construct the new file path for the edited EMG decomposition
+        self.file_path_json = os.path.join(savefolder, filename + '_edited.json')
 
-        self.file_path_json = os.path.join(savefolder, filename +'_edited.json')
-        self.edited_dict["SOURCE"] = "CUSTOMCSV"
-        self.edited_dict["FILENAME"] = "training40" 
-        self.edited_dict["RAW_SIGNAL"] = self.emgfile['RAW_SIGNAL']
-        self.edited_dict["REF_SIGNAL"] = self.emgfile['REF_SIGNAL']
-        self.edited_dict["ACCURACY"] = pd.DataFrame(self.sil_old)
-        self.edited_dict["IPTS"] = pd.DataFrame(self.emgfile['IPTS'])
-        self.edited_dict["MUPULSES"] = [np.array(item) for item in self.emgfile['MUPULSES']]
-        self.edited_dict["FSAMP"] = float(self.fsamp)
-        self.edited_dict["IED"] = float(8.75) # for 4-8-L
-        self.edited_dict["BINARY_MUS_FIRING"] = pd.DataFrame(binary_mus_firing).T
-        self.edited_dict["EMG_LENGTH"] = self.emgfile['RAW_SIGNAL'].shape[0]
-        self.edited_dict["NUMBER_OF_MUS"] = len(self.emgfile["IPTS"].columns)
-        # self.edited_dict["EXTRAS"] = pd.DataFrame(columns=[0])
-        self.edited_dict["EXTRAS"] = pd.DataFrame([])
-        
-        # based on the function 
-        source = json.dumps(self.edited_dict["SOURCE"])
-        filename = json.dumps(self.edited_dict["FILENAME"])
-        fsamp = json.dumps(self.edited_dict["FSAMP"])
-        ied = json.dumps(self.edited_dict["IED"])
-        emg_length = json.dumps(self.edited_dict["EMG_LENGTH"])
-        number_of_mus = json.dumps(self.edited_dict["NUMBER_OF_MUS"])
+        # Directly assign values for JSON dumping
+        source = json.dumps("CUSTOMCSV")
+        filename = json.dumps("training40")
+        raw_signal = pd.DataFrame(self.emgfile['RAW_SIGNAL']).to_json(orient='split')
+        ref_signal = pd.DataFrame(self.emgfile['REF_SIGNAL']).to_json(orient='split')
+        accuracy = pd.DataFrame(self.sil_old).to_json(orient='split')
+        ipts = pd.DataFrame(self.emgfile['IPTS']).to_json(orient='split')
+        mupulses = json.dumps([np.array(item).tolist() for item in self.emgfile['MUPULSES']])
+        fsamp = json.dumps(float(self.fsamp))
+        ied = json.dumps(float(8.75))  # for grid type 4-8-L
+        binary_mus_firing = pd.DataFrame(binary_mus_firing).T.to_json(orient='split')
+        emg_length = json.dumps(self.emgfile['RAW_SIGNAL'].shape[0])
+        number_of_mus = json.dumps(len(self.emgfile['IPTS'].columns))
+        extras = pd.DataFrame([]).to_json(orient='split')
 
-        # Access and convert the dict to a json object.
-        # orient='split' is fundamental for performance.
-        raw_signal = self.edited_dict["RAW_SIGNAL"].to_json(orient='split')
-        ref_signal = self.edited_dict["REF_SIGNAL"].to_json(orient='split')
-        accuracy = self.edited_dict["ACCURACY"].to_json(orient='split')
-        ipts = self.edited_dict["IPTS"].to_json(orient='split')
-        binary_mus_firing = self.edited_dict["BINARY_MUS_FIRING"].to_json(orient='split')
-        extras = self.edited_dict["EXTRAS"].to_json(orient='split')
-
-        # Every array has to be converted in a list; then, the list of lists
-        # can be converted to json.
-        mupulses = []
-        for ind, array in enumerate(self.edited_dict["MUPULSES"]):
-            mupulses.insert(ind, array.tolist())
-        mupulses = json.dumps(mupulses)
-
-        # Convert a dict of json objects to json. The result of the conversion
-        # will be saved as the final json file.
+        # Create the final JSON structure
         emgfile = {
             "SOURCE": source,
             "FILENAME": filename,
@@ -959,13 +950,8 @@ class EditMU:
             "EXTRAS": extras,
         }
 
-        # Compress and write the json file
-        with gzip.open(
-            self.file_path_json,
-            "wt",
-            encoding="utf-8",
-            compresslevel=4
-        ) as f:
+        # Compress and write the JSON file
+        with gzip.open(self.file_path_json, "wt", encoding="utf-8", compresslevel=4) as f:
             json.dump(emgfile, f)
 
         return self.file_path_json

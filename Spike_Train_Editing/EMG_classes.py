@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import simpledialog
 from tkinter import filedialog 
 
-from scipy import signal
+from scipy.signal import detrend
 from scipy import io
 import time
 from tqdm import tqdm
@@ -488,7 +488,7 @@ class offline_EMG(EMG):
         self.signal_dict['inv_extend_obvs'][interval] = np.linalg.pinv(self.signal_dict['sq_extend_obvs'][interval]) # different method of pinv in MATLAB --> SVD vs QR
         
         # de-mean the extended emg observation matrix
-        self.signal_dict['extend_obvs_old'][interval] = scipy.signal.detrend(self.signal_dict['extend_obvs_old'][interval], axis=- 1, type='constant', bp=0)
+        self.signal_dict['extend_obvs_old'][interval] = detrend(self.signal_dict['extend_obvs_old'][interval], axis=- 1, type='constant', bp=0)
         
         # whiten the signal + impose whitened extended observation matrix has a covariance matrix equal to the identity for time lag zero
         self.decomp_dict['whitened_obvs_old'][interval],self.decomp_dict['whiten_mat'][interval], self.decomp_dict['dewhiten_mat'][interval] = whiten_emg(self.signal_dict['extend_obvs_old'][interval])
