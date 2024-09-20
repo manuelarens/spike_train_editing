@@ -11,6 +11,7 @@ from sklearn.cluster import KMeans
 import numba
 from sklearn.decomposition import IncrementalPCA
 from numba import jit
+import json, gzip, warnings
 
 ##################################### FILTERING TOOLS #######################################################
 
@@ -1176,3 +1177,138 @@ def knn_online(trains, fsamp, cluster_centers):
 
 
     return discharge_times
+
+def emg_from_json(filepath):
+    """
+    Load the emgfile or emg_refsig stored in json format.
+
+    Parameters
+    ----------
+    filepath : str or Path
+        The directory and the name of the file to load (including file
+        extension .json).
+        This can be a simple string, the use of Path is not necessary.
+
+    Returns
+    -------
+    emgfile : dict
+        The dictionary containing the emgfile.
+
+    See also
+    --------
+    - save_json_emgfile : Save the emgfile or emg_refsig as a JSON file.
+    - askopenfile : Select and open files with a GUI.
+
+    Notes
+    -----
+    The returned file is called ``emgfile`` for convention
+    (or ``emg_refsig`` if SOURCE in ["OTB_REFSIG", "CUSTOMCSV_REFSIG", "DELSYS_REFSIG"]).
+
+    Examples
+    --------
+    For an extended explanation of the imported emgfile use:
+
+    >>> import openhdemg.library as emg
+    >>> emgfile = emg.emg_from_json(filepath="path/filename.json")
+    >>> info = emg.info()
+    >>> info.data(emgfile)
+    """
+
+    # Read and decompress json file
+    with gzip.open(filepath, "rt", encoding="utf-8") as f:
+        jsonemgfile = json.load(f)
+
+    """
+    print(type(jsonemgfile))
+    <class 'dict'>
+    """
+
+    # Access the dictionaries and extract the data.
+    source = json.loads(jsonemgfile["SOURCE"])
+    filename = json.loads(jsonemgfile["FILENAME"])
+
+    if source in ["DEMUSE", "OTB", "CUSTOMCSV", "DELSYS"]:
+        # RAW_SIGNAL
+        # df are stored in json as a dictionary, it can be directly extracted
+        # and converted into a pd.DataFrame.
+        # index and columns are imported as str, we need to convert it to int.
+        raw_signal = pd.read_json(jsonemgfile["RAW_SIGNAL"], orient='split')
+        # Check dtypes for safety, little computational cost
+        raw_signal.columns = raw_signal.columns.astype(int)
+        raw_signal.index = raw_signal.index.astype(int)
+        raw_signal.sort_index(inplace=True)
+        # REF_SIGNAL
+        ref_signal = pd.read_json(jsonemgfile["REF_SIGNAL"], orient='split')
+        ref_signal.columns = ref_signal.columns.astype(int)
+        ref_signal.index = ref_signal.index.astype(int)
+        ref_signal.sort_index(inplace=True)
+        # ACCURACY
+        accuracy = pd.read_json(jsonemgfile["ACCURACY"], orient='split')
+        try:
+            accuracy.columns = accuracy.columns.astype(int)
+        except Exception:
+            accuracy.columns = [*range(len(accuracy.columns))]
+            warnings.warn(
+                "Error while loading accuracy, check or recalculate accuracy"
+            )
+            # TODO error occurring when accuracy was recalculated on empty MUs.
+            # Check if the error is present also for other params.
+        accuracy.index = accuracy.index.astype(int)
+        accuracy.sort_index(inplace=True)
+        # IPTS
+        ipts = pd.read_json(jsonemgfile["IPTS"], orient='split')
+        ipts.columns = ipts.columns.astype(int)
+        ipts.index = ipts.index.astype(int)
+        ipts.sort_index(inplace=True)
+        # MUPULSES
+        # It is s list of lists but has to be converted in a list of ndarrays.
+        mupulses = []
+    
+        mupulses = json.loads(jsonemgfile["MUPULSES"])
+        for num, element in enumerate(mupulses):
+            mupulses[num] = np.array(element)
+
+        if "MU_filters" in jsonemgfile:
+            MU_filters = np.array(json.loads(jsonemgfile["MU_filters"]))
+        else:
+            MU_filters = np.array([])
+
+   
+        # FSAMP
+        # Make sure to convert it to float
+        fsamp = float(json.loads(jsonemgfile["FSAMP"]))
+        # IED
+        ied = float(json.loads(jsonemgfile["IED"]))
+        # EMG_LENGTH
+        # Make sure to convert it to int
+        emg_length = int(json.loads(jsonemgfile["EMG_LENGTH"]))
+        # NUMBER_OF_MUS
+        number_of_mus = int(json.loads(jsonemgfile["NUMBER_OF_MUS"]))
+        # BINARY_MUS_FIRING
+        binary_mus_firing = pd.read_json(
+            jsonemgfile["BINARY_MUS_FIRING"],
+            orient='split',
+        )
+        binary_mus_firing.columns = binary_mus_firing.columns.astype(int)
+        binary_mus_firing.index = binary_mus_firing.index.astype(int)
+        binary_mus_firing.sort_index(inplace=True)
+        # EXTRAS
+        # Don't alter index and columns as these could contain anything.
+        extras = pd.read_json(jsonemgfile["EXTRAS"], orient='split')
+
+        emgfile = {
+            "SOURCE": source,
+            "FILENAME": filename,
+            "RAW_SIGNAL": raw_signal,
+            "REF_SIGNAL": ref_signal,
+            "ACCURACY": accuracy,
+            "IPTS": ipts,
+            "MUPULSES": mupulses,
+            "FSAMP": fsamp,
+            "IED": ied,
+            "EMG_LENGTH": emg_length,
+            "NUMBER_OF_MUS": number_of_mus,
+            "BINARY_MUS_FIRING": binary_mus_firing,
+            "EXTRAS": extras,
+            "MU_filters": MU_filters,
+        }

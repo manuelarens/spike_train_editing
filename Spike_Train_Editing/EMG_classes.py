@@ -16,7 +16,6 @@ import pandas as pd
 import json 
 import tkinter as tk
 import gzip 
-import os 
 from os.path import join, dirname, realpath 
 import sys
 from TMSiFileFormats.file_readers import Xdf_Reader
