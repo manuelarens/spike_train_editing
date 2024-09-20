@@ -1,3 +1,11 @@
+"""
+EditMU Class
+
+This class provides a graphical user interface for editing and analyzing motor unit spike trains
+in HD-EMG data. It allows for interactive modification, visualization, and recalculation of EMG
+data using various tools and filters.
+"""
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -5,6 +13,9 @@ from matplotlib.widgets import Button, RectangleSelector
 import seaborn as sns
 import tkinter as tk
 from tkinter import messagebox
+import json
+import os
+import gzip
 
 from openhdemg.library.mathtools import compute_sil
 from openhdemg.library.plotemg import showgoodlayout
@@ -15,6 +26,7 @@ class EditMU:
     def __init__(
         self,
         emgfile,
+        filepath,
         addrefsig=False,
         timeinseconds=True,
         figsize=(20, 15),
@@ -53,6 +65,7 @@ class EditMU:
         for displaying and interacting with motor unit data.
         """
         # Initialize attributes
+        self.filepath = filepath
         self.emgfile = emgfile
         self.addrefsig = addrefsig
         self.timeinseconds = timeinseconds
@@ -73,11 +86,20 @@ class EditMU:
         # Initialize the current MU index
         self.current_index = 0
 
+        self.edited_dict = {}
+
+        self.grid_name = '4-8-L'
+
         # Initialize additional attributes
         self.peak_artists = []
-        self.first_plot = [True] * len(emgfile['MUPULSES'])
         self.sil_recalculated = [False] * len(emgfile['MUPULSES'])
         self.sil_old = np.zeros(len(emgfile['MUPULSES']))
+        for i in range(len(self.emgfile["IPTS"].columns)):
+            self.sil_old[i] = compute_sil(
+            self.ipts[i],
+            self.emgfile["MUPULSES"][i]
+        )
+
         self.sil_new = np.zeros(len(emgfile['MUPULSES']))
         self.sil_color = 'black'
 
@@ -173,7 +195,7 @@ class EditMU:
             self.emgfile["MUPULSES"][self.current_index]
         )
 
-        if self.first_plot[self.current_index] or not self.sil_recalculated[self.current_index]:
+        if not self.sil_recalculated[self.current_index]:
             # First plot or not recalculated: use default color and no difference text
             self.sil_color = 'black'
             sil_dif_text = ""
@@ -444,7 +466,6 @@ class EditMU:
             del self.emgfile['MUPULSES'][self.current_index]
 
             # Update internal state variables
-            self.first_plot.pop(self.current_index)
             self.sil_recalculated.pop(self.current_index)
             self.sil_old = np.delete(self.sil_old, self.current_index)
             self.sil_new = np.delete(self.sil_new, self.current_index)
@@ -712,9 +733,6 @@ class EditMU:
             print('No pulses selected, please select pulses or delete MU')
             return
 
-        # Set the first_plot flag to False after the initial plot
-        self.first_plot[self.current_index] = False
-
         # Recalculate the pulse train
         spikes = self.recalc_pulse_train()
 
@@ -753,7 +771,7 @@ class EditMU:
         # Initialize EMG object and prepare the data
         emg_obj = recalc_filter()
 
-        emg_obj.convert_dict(self.emgfile, grid_names=['4-8-L'])  # Converts MATLAB output to EMG object format
+        emg_obj.convert_dict(self.emgfile, grid_names=self.grid_name)  # Converts MATLAB output to EMG object format
         emg_obj.grid_formatter()  # Adds spatial context to the EMG object
 
         emg = emg_obj.signal_dict["data"]
@@ -762,7 +780,7 @@ class EditMU:
             1, np.shape(emg)[0] * extension_factor, np.shape(emg)[1] + extension_factor - 1 - emg_obj.differential_mode
         ])
 
-        # Prepare EMG signal and calculate pulse train
+        # Prepare EMG signal and calculate pulse train according to MUedit
         spikes = self.emgfile["MUPULSES"][self.current_index]
         eSIG = extend_emg(emg_obj.signal_dict['extend_obvs_old'][0], emg, extension_factor)
 
@@ -781,12 +799,16 @@ class EditMU:
         Pt[-round(0.1 * emg_obj.sample_rate):] = 0
         Pt = Pt * np.abs(Pt)
 
+        # Detect peaks from new pulse train
         min_peak_distance = round(emg_obj.sample_rate * 0.005)
         spikes = detect_peaks(Pt, mpd=min_peak_distance)
 
+        # Scale according to 10 biggest peaks
         Pt /= np.mean(maxk(Pt, 10))
 
+        # Save new pulse train
         self.emgfile["IPTS"][self.current_index] = np.pad(Pt, (0, 4))
+        self.ipts[self.current_index] = self.emgfile["IPTS"][self.current_index] 
 
         return spikes
 
@@ -807,7 +829,7 @@ class EditMU:
             spikes (np.ndarray): Array of spike indices to be processed.
         """
         # Access the current motor unit's pulse train and IPTS data
-        Pt = self.emgfile["IPTS"][self.current_index]
+        Pt = self.ipts[self.current_index]
         
         # Select pulse values corresponding to the provided spike indices
         pulse_values = np.array(Pt[spikes])
@@ -868,3 +890,82 @@ class EditMU:
         sns.lineplot(x=xref, y=self.emgfile["REF_SIGNAL"][0], color="0.4", ax=ax2)
         ax2.set_ylabel("MVC")
 
+
+    def save_EMG_decomposition(self):
+        # adapted from OpenHDEMG, function save_to_json()
+        savefolder = os.path.dirname(self.filepath)
+        base=os.path.basename(self.filepath) #get only the file+extension  
+        filename = os.path.splitext(base)[0]
+
+        binary_mus_firing = get_binary_pulse_trains(self.emgfile["MUPULSES"], self.emgfile['RAW_SIGNAL'].shape[0])
+
+        
+
+        self.file_path_json = os.path.join(savefolder, filename +'_edited.json')
+        self.edited_dict["SOURCE"] = "CUSTOMCSV"
+        self.edited_dict["FILENAME"] = "training40" 
+        self.edited_dict["RAW_SIGNAL"] = self.emgfile['RAW_SIGNAL']
+        self.edited_dict["REF_SIGNAL"] = self.emgfile['REF_SIGNAL']
+        self.edited_dict["ACCURACY"] = pd.DataFrame(self.sil_old)
+        self.edited_dict["IPTS"] = pd.DataFrame(self.emgfile['IPTS'])
+        self.edited_dict["MUPULSES"] = [np.array(item) for item in self.emgfile['MUPULSES']]
+        self.edited_dict["FSAMP"] = float(self.fsamp)
+        self.edited_dict["IED"] = float(8.75) # for 4-8-L
+        self.edited_dict["BINARY_MUS_FIRING"] = pd.DataFrame(binary_mus_firing).T
+        self.edited_dict["EMG_LENGTH"] = self.emgfile['RAW_SIGNAL'].shape[0]
+        self.edited_dict["NUMBER_OF_MUS"] = int(len(self.emgfile["IPTS"].columns))
+        # self.edited_dict["EXTRAS"] = pd.DataFrame(columns=[0])
+        self.edited_dict["EXTRAS"] = pd.DataFrame([])
+        
+        # based on the function 
+        source = json.dumps(self.edited_dict["SOURCE"])
+        filename = json.dumps(self.edited_dict["FILENAME"])
+        fsamp = json.dumps(self.edited_dict["FSAMP"])
+        ied = json.dumps(self.edited_dict["IED"])
+        emg_length = json.dumps(self.edited_dict["EMG_LENGTH"])
+        number_of_mus = json.dumps(self.edited_dict["NUMBER_OF_MUS"])
+
+        # Access and convert the dict to a json object.
+        # orient='split' is fundamental for performance.
+        raw_signal = self.edited_dict["RAW_SIGNAL"].to_json(orient='split')
+        ref_signal = self.edited_dict["REF_SIGNAL"].to_json(orient='split')
+        accuracy = self.edited_dict["ACCURACY"].to_json(orient='split')
+        ipts = self.edited_dict["IPTS"].to_json(orient='split')
+        binary_mus_firing = self.edited_dict["BINARY_MUS_FIRING"].to_json(orient='split')
+        extras = self.edited_dict["EXTRAS"].to_json(orient='split')
+
+        # Every array has to be converted in a list; then, the list of lists
+        # can be converted to json.
+        mupulses = []
+        for ind, array in enumerate(self.edited_dict["MUPULSES"]):
+            mupulses.insert(ind, array.tolist())
+        mupulses = json.dumps(mupulses)
+
+        # Convert a dict of json objects to json. The result of the conversion
+        # will be saved as the final json file.
+        emgfile = {
+            "SOURCE": source,
+            "FILENAME": filename,
+            "RAW_SIGNAL": raw_signal,
+            "REF_SIGNAL": ref_signal,
+            "ACCURACY": accuracy,
+            "IPTS": ipts,
+            "MUPULSES": mupulses,
+            "FSAMP": fsamp,
+            "IED": ied,
+            "EMG_LENGTH": emg_length,
+            "NUMBER_OF_MUS": number_of_mus,
+            "BINARY_MUS_FIRING": binary_mus_firing,
+            "EXTRAS": extras,
+        }
+
+        # Compress and write the json file
+        with gzip.open(
+            self.file_path_json,
+            "wt",
+            encoding="utf-8",
+            compresslevel=4
+        ) as f:
+            json.dump(emgfile, f)
+
+        return self.file_path_json
