@@ -913,7 +913,7 @@ class EditMU:
         self.edited_dict["IED"] = float(8.75) # for 4-8-L
         self.edited_dict["BINARY_MUS_FIRING"] = pd.DataFrame(binary_mus_firing).T
         self.edited_dict["EMG_LENGTH"] = self.emgfile['RAW_SIGNAL'].shape[0]
-        self.edited_dict["NUMBER_OF_MUS"] = int(len(self.emgfile["IPTS"].columns))
+        self.edited_dict["NUMBER_OF_MUS"] = len(self.emgfile["IPTS"].columns)
         # self.edited_dict["EXTRAS"] = pd.DataFrame(columns=[0])
         self.edited_dict["EXTRAS"] = pd.DataFrame([])
         
