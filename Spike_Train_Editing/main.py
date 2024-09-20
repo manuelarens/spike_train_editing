@@ -39,7 +39,7 @@ def main():
 
     
     # Open file dialog to select the EMG data file
-    #"""
+    """
     filepath = filedialog.askopenfilename(
         title='Select data file',
         filetypes=(('Data files (.poly5, .xdf)', '*.poly5 *.xdf'), ('All files', '*.*')),
@@ -47,7 +47,7 @@ def main():
     )
     #"""
 
-    #"""
+    """
     # If no file is selected, exit the script
     if filepath == '':
         print("No file selected. Exiting the script.")
@@ -58,9 +58,9 @@ def main():
     #"""
 
     # Run offline EMG decomposition
-    filepath_decomp = run_offline_decomposition(filepath)
+    #filepath_decomp = run_offline_decomposition(filepath)
 
-    #filepath_decomp = r'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\training_measurement-20240611_085328_decomp.json' #own decomp
+    filepath_decomp = 'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\training_measurement-20240611_085328_decomp.json' #own decomp
     #filepath_decomp = r'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\training_20240611_085441_decomp.json' #tmsi decomp
     #filepath_decomp = r'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\Pre_25_b.json' #openhdemg decomp
 

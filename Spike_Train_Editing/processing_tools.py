@@ -1312,3 +1312,27 @@ def emg_from_json(filepath):
             "EXTRAS": extras,
             "MU_filters": MU_filters,
         }
+
+    elif source in ["OTB_REFSIG", "CUSTOMCSV_REFSIG", "DELSYS_REFSIG"]:
+        # FSAMP
+        fsamp = float(json.loads(jsonemgfile["FSAMP"]))
+        # REF_SIGNAL
+        ref_signal = pd.read_json(jsonemgfile["REF_SIGNAL"], orient='split')
+        ref_signal.columns = ref_signal.columns.astype(int)
+        ref_signal.index = ref_signal.index.astype(int)
+        ref_signal.sort_index(inplace=True)
+        # EXTRAS
+        extras = pd.read_json(jsonemgfile["EXTRAS"], orient='split')
+
+        emgfile = {
+            "SOURCE": source,
+            "FILENAME": filename,
+            "FSAMP": fsamp,
+            "REF_SIGNAL": ref_signal,
+            "EXTRAS": extras,
+        }
+
+    else:
+        raise Exception("\nFile source not recognised\n")
+
+    return emgfile
