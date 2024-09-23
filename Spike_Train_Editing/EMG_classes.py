@@ -28,7 +28,7 @@ class EMG():
     
     def __init__(self):
         # processing settings
-        self.its = 50 # number of iterations of the fixed point algorithm 
+        self.its = 100 # number of iterations of the fixed point algorithm 
         self.ref_exist = 1 # Boolean for whether an existing reference is used for signal batching (otherwise, manual selection)
         self.windows = 1  # number of segmented windows over each contraction
         self.check_emg = 0 # Boolean for the review process of EMG channels, where 0 = Automatic selection 1 = Visual checking
@@ -184,7 +184,7 @@ class offline_EMG(EMG):
                 self.emg_type = 0 # surface HD EMG 
                 
                 
-            if grid_names[i] == '8-8-L':
+            elif grid_names[i] == '8-8-L':
                 ElChannelMap = [[16, 21, 26, 31, 32, 37, 42, 47],
                                 [15, 20, 25, 30, 33, 38, 43, 48],
                                 [14, 19, 24, 29, 34, 39, 44, 49],
@@ -198,7 +198,7 @@ class offline_EMG(EMG):
                 IED = 8.75
                 self.emg_type = 0 # surface HD EMG 
                                  
-            if grid_names[i] == 'GR04MM1305':
+            elif grid_names[i] == 'GR04MM1305':
                 ElChannelMap = [[0, 24, 25, 50, 51], 
                         [0, 23, 26, 49, 52], 
                         [1, 22, 27, 48, 53], 
@@ -283,6 +283,8 @@ class offline_EMG(EMG):
                 rejected_channels = np.zeros([self.signal_dict['ngrids'],40])
                 IED = 1
                 self.emg_type = 1
+            else:
+                raise Exception("\nGrid name not recognised\n")
             
             ElChannelMap = np.array(ElChannelMap) # convert list to np array
             chans_per_grid = (np.shape(ElChannelMap)[0] * np.shape(ElChannelMap)[1])

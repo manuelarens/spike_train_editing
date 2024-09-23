@@ -29,6 +29,10 @@ Ensure you have the following Python packages installed:
 - `tkinter` (for file dialog)
 - `gzip` (for handling compressed files)
 - `openhdemg`
+- `seaborn`
+- `numba`
+- `scikit-learn`
+- `tqdm`
 
 You can install these dependencies using pip:
 

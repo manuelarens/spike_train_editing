@@ -23,7 +23,7 @@ sys.path.append(MODULES_DIR)  # Add modules directory to system path for importi
 
 # Now import the modules that depend on the path
 from processing_tools import emg_from_json
-from EMG_Decomposition import EMG_Decomposition
+from EMG_Decomposition import EMGDecomposition
 from TMSiFileFormats.file_readers import Poly5Reader
 from EditMU import EditMU
 
@@ -56,10 +56,9 @@ def main():
 
     # Display the raw EMG file using MNE
     display_raw_emg(filepath)
+    filepath_decomp = run_offline_decomposition(filepath)
     #"""
 
-    # Run offline EMG decomposition
-    #filepath_decomp = run_offline_decomposition(filepath)
 
     filepath_decomp = 'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\training_measurement-20240611_085328_decomp.json' #own decomp
     #filepath_decomp = r'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\training_20240611_085441_decomp.json' #tmsi decomp
@@ -107,7 +106,7 @@ def run_offline_decomposition(filepath):
     print('START OFFLINE DECOMPOSITION')
 
     # Create EMG decomposition object and run the decomposition process
-    offline_decomp = EMG_Decomposition(filepath=filepath)
+    offline_decomp = EMGDecomposition(filepath=filepath)
     offline_decomp.run(grid_name=GRID_TYPE)
 
     # Get the path to the saved decomposed JSON file

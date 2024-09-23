@@ -89,7 +89,7 @@ class EditMU:
 
         self.edited_dict = {}
 
-        self.grid_name = '4-8-L'
+        self.grid_name = ['4-8-L']
 
         # Initialize additional attributes
         self.peak_artists = []
