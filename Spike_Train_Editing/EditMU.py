@@ -106,20 +106,24 @@ class EditMU:
         self.sil_new = np.zeros(len(emgfile['MUPULSES']))
         self.sil_color = 'black'
 
-        # Create plot
-        self.fig, self.ax1 = plt.subplots(
-            figsize=(figsize[0] / 2.54, figsize[1] / 2.54),
-            num="IPTS"
+        # Create the figure and two subplots (ax1 and ax2 stacked vertically)
+        self.fig, (self.ax1, self.ax2) = plt.subplots(
+            2, 1,  # Two rows, one column
+            figsize=(figsize[0] / 2.54, figsize[1] / 2.54),  # Convert cm to inches
+            num="IPTS"  # Figure title or window name
         )
+
+        # Set shared x-axis for the subplots
+        self.ax1.get_shared_x_axes().joined(self.ax1, self.ax2)
 
         # Initialize the RectangleSelectors
         self.rect_selector_add = RectangleSelector(
-            self.ax1, self.onselect_add, useblit=True, button=[1]
+            self.ax2, self.onselect_add, useblit=True, button=[1]
         )
         self.rect_selector_add.set_active(False)
 
         self.rect_selector_remove = RectangleSelector(
-            self.ax1, self.onselect_remove, useblit=True, button=[1]
+            self.ax2, self.onselect_remove, useblit=True, button=[1]
         )
         self.rect_selector_remove.set_active(False)
 
@@ -145,7 +149,7 @@ class EditMU:
         showgoodlayout(self.tight_layout, despined="2yaxes" if addrefsig else False)
 
         manager = plt.get_current_fig_manager()
-        manager.full_screen_toggle()
+        manager.window.showMaximized()
 
         # Show the plot immediately if needed
         if showimmediately:
@@ -166,83 +170,89 @@ class EditMU:
 
     def plot_current_mu(self):
         """
-        Plot the current motor unit (MU) and update its associated metrics.
+        Plot the current motor unit (MU) and its instantaneous discharge rate.
 
-        This method performs the following tasks:
-        1. Clears the current plot to prepare for a new plot.
-        2. Plots the data for the current MU using the x-axis and IPTS values.
-        3. Sets the y-axis label to indicate the current MU number.
-        4. Calls `plot_peaks` to plot peaks for the current MU.
-        5. Computes the Signal-to-Interference Level (SIL) for the current MU.
-        6. Determines the color of the SIL text based on the SIL difference from the previous plot.
-        7. Updates the old SIL value with the new SIL value.
-        8. Displays the SIL value on the plot with the appropriate color and formatting.
-        9. Sets the x-axis label based on whether time is in seconds or samples.
-        10. Adds any additional instructions or annotations to the plot.
-
-        The method ensures that the plot is updated with the latest information about the
-        motor unit, including visual markers for peaks and metrics for the SIL. It also
-        updates the plot's appearance and labels according to the current state of the data.
+        This method calls separate functions to:
+        1. Plot the instantaneous discharge rate.
+        2. Plot the IPTS data for the current MU.
+        3. Optionally add the reference signal to the plot.
         """
 
-        # Clear previous plot
-        self.ax1.clear()
-        
-        # Plot the current MU
-        self.ax1.plot(self.x_axis, self.ipts[self.current_index])
-        self.ax1.set_ylabel(f"MU {self.current_index + 1}")
-        
-        # Plot peaks
+        # Plot discharge rate (top subplot)
+        self.plot_discharge_rate()
+        self.add_instructions()
+
+        # Plot IPTS data (bottom subplot)
+        self.plot_ipts()
+
+        # Optionally add reference signal to the bottom subplot
+        self.add_ref_signal()
+
+        # Adjust layout to avoid overlap
+        self.fig.tight_layout()
+        self.fig.subplots_adjust(hspace=0.4)  # Space between subplots
+
+    def plot_ipts(self):
+        """
+        Plot the current motor unit (MU) data (IPTS) on the bottom subplot.
+        """
+        self.ax2.clear()  # Clear previous plot on the bottom subplot
+        self.ax2.plot(self.x_axis, self.ipts[self.current_index])
+        self.ax2.set_ylabel(f"MU {self.current_index + 1}")
+        self.ax2.set_xlabel("Time (Sec)" if self.timeinseconds else "Samples")
+
+        # Plot peaks on the bottom subplot
         self.plot_peaks()
-        
-        # Compute new SIL
+
+        # Compute and display SIL
         self.sil_new[self.current_index] = compute_sil(
             self.ipts[self.current_index],
             self.emgfile["MUPULSES"][self.current_index]
         )
 
+        # Handle SIL color and difference text logic
         if not self.sil_recalculated[self.current_index]:
-            # First plot or not recalculated: use default color and no difference text
             self.sil_color = 'black'
             sil_dif_text = ""
         else:
-            # Calculate SIL difference
             sil_dif = self.sil_new[self.current_index] - self.sil_old[self.current_index]
             sil_dif_text = f' (Δ = {sil_dif:.5f})'
+            self.sil_color = 'limegreen' if sil_dif > 0 else 'red' if sil_dif < 0 else 'black'
 
-            # Determine SIL color based on difference
-            if sil_dif > 0:
-                self.sil_color = 'limegreen' if sil_dif < 0.02 else 'darkgreen'
-            elif sil_dif < 0:
-                self.sil_color = 'salmon' if sil_dif > -0.02 else 'red'
-            else:
-                self.sil_color = 'black'
-
-        # Update old SIL value
         self.sil_old[self.current_index] = self.sil_new[self.current_index]
 
-        # Display SIL value
         self.ax1.text(
-            0.39,
-            1.05,
-            f"SIL = {self.sil_new[self.current_index]:.6f}{sil_dif_text}",
-            ha="left",
-            va="center",
-            transform=self.ax1.transAxes,
-            fontsize=10,
-            fontweight="bold",
-            color=self.sil_color
+            0.41, 1, f"SIL = {self.sil_new[self.current_index]:.6f}{sil_dif_text}",
+            ha="left", va="center", transform=self.ax1.transAxes,
+            fontsize=13, fontweight="bold", color=self.sil_color
         )
 
-        # Set x-axis label
-        self.ax1.set_xlabel("Time (Sec)" if self.timeinseconds else "Samples")
+    def plot_discharge_rate(self):
+        """
+        Plot the instantaneous discharge rate on the top subplot.
+        """
+        self.ax1.clear()  # Clear previous plot on the top subplot
+        mu_pulses = self.emgfile['MUPULSES'][self.current_index]
+        
+        if len(mu_pulses) > 1:
+            discharge_intervals = np.diff(mu_pulses) / self.emgfile['FSAMP']  # Convert to seconds
+            discharge_rate = 1 / discharge_intervals  # Pulses per second
+            time_pulses = mu_pulses[1:] / self.emgfile['FSAMP'] if self.timeinseconds else mu_pulses[1:]
 
-        # Add instructions
-        self.add_instructions()
+            # Plot discharge rate as a scatter plot in the top subplot
+            self.ax1.scatter(time_pulses, discharge_rate, color='blue', label="Discharge Rate (Pulses/Sec)")
+            self.ax1.set_ylabel("Discharge Rate (Pulses/Sec)")
+            
+        else:
+            self.ax1.text(0.5, 0.5, 'Not enough pulses for rate calculation', transform=self.ax1.transAxes, 
+                        ha='center', va='center')
 
-        # Optional reference signal
+    def add_ref_signal(self):
+        """
+        Plot the reference signal on a secondary y-axis of the bottom subplot.
+        """
         if self.addrefsig:
-            ax2 = self.ax1.twinx()
+            ax3 = self.ax2.twinx()  # Create a twin y-axis on the bottom subplot
             xref = (
                 self.emgfile["REF_SIGNAL"].index / self.emgfile["FSAMP"]
                 if self.timeinseconds
@@ -252,15 +262,9 @@ class EditMU:
                 x=xref,
                 y=self.emgfile["REF_SIGNAL"][0],
                 color="0.4",
-                ax=ax2,
+                ax=ax3,
             )
-            ax2.set_ylabel("MVC")
-        
-        self.ax1.set_position([0.05, 0.1, 0.75, 0.75])
-
-        tight_layout = 1
-        showgoodlayout(tight_layout, despined="2yaxes" if self.addrefsig else False)
-
+            ax3.set_ylabel("MVC")
 
     def plot_peaks(self):
         """
@@ -296,7 +300,7 @@ class EditMU:
             # Get the y-value corresponding to the closest point
             y_value = self.ipts.iloc[closest_idx, self.current_index]
             # Plot the pulse as a red circle and enable picking
-            peak_artist, = self.ax1.plot(
+            peak_artist, = self.ax2.plot(
                 pulse, y_value, "ro", markersize=2, picker=True
             )
             self.peak_artists.append(peak_artist)
@@ -330,6 +334,7 @@ class EditMU:
         # Ensure new x-axis limits are within valid range
         if min(new_xlim) > 0 and max(new_xlim) < max(self.x_axis):
             self.ax1.set_xlim(new_xlim)  # Update x-axis limits
+            self.ax2.set_xlim(new_xlim)
             self.fig.canvas.draw_idle()  # Redraw the canvas to apply changes
 
 
@@ -370,6 +375,7 @@ class EditMU:
         if current_xlim[0] - delta > 0:
             new_xlim = [current_xlim[0] - delta, current_xlim[1] - delta]  # Calculate new x-axis limits
             self.ax1.set_xlim(new_xlim)  # Update x-axis limits
+            self.ax2.set_xlim(new_xlim)
             self.fig.canvas.draw_idle()  # Redraw the canvas to apply changes
 
     def scroll_right(self):
@@ -392,6 +398,7 @@ class EditMU:
         if current_xlim[1] + delta < max(self.x_axis):
             new_xlim = [current_xlim[0] + delta, current_xlim[1] + delta]  # Calculate new x-axis limits
             self.ax1.set_xlim(new_xlim)  # Update x-axis limits
+            self.ax2.set_xlim(new_xlim)
             self.fig.canvas.draw_idle()  # Redraw the canvas to apply changes
 
 
@@ -425,22 +432,22 @@ class EditMU:
         self.btn_next.on_clicked(self.next_mu)  # Link button to method
 
         # Create and position "Add spikes" button
-        ax_add = plt.axes([0.85, 0.82, 0.14, 0.04])
+        ax_add = plt.axes([0.08, 0.51, 0.19, 0.04])
         self.btn_add = Button(ax_add, "Add spikes", color=self.button_color)
         self.btn_add.on_clicked(self.add_spikes)  # Link button to method
 
         # Create and position "Remove spikes" button
-        ax_remove = plt.axes([0.85, 0.76, 0.14, 0.04])
+        ax_remove = plt.axes([0.3, 0.51, 0.19, 0.04])
         self.btn_remove = Button(ax_remove, "Remove spikes", color=self.button_color)
         self.btn_remove.on_clicked(self.remove_spikes)  # Link button to method
 
         # Create and position "Recalc. filter" button
-        ax_recalc = plt.axes([0.85, 0.70, 0.14, 0.04])
+        ax_recalc = plt.axes([0.52, 0.51, 0.19, 0.04])
         self.btn_recalc = Button(ax_recalc, "Recalc. filter", color=self.button_color)
         self.btn_recalc.on_clicked(self.recalc_filter)  # Link button to method
 
         # Create and position "Delete MU" button with distinct color
-        ax_delete = plt.axes([0.85, 0.95, 0.14, 0.04])
+        ax_delete = plt.axes([0.74, 0.51, 0.19, 0.04])
         self.btn_delete = Button(ax_delete, "Delete MU", color='tomato', hovercolor='salmon')
         self.btn_delete.on_clicked(self.delete_MU)  # Link button to method
 
@@ -660,7 +667,7 @@ class EditMU:
             ymax = ymasked.max()
 
             # Plot the peak and add it to the list of peak artists
-            peak_artist, = self.ax1.plot(xmax, ymax, "ro", markersize=2, label="Peak")
+            peak_artist, = self.ax2.plot(xmax, ymax, "ro", markersize=2, label="Peak")
             self.peak_artists.append(peak_artist)  # Store the artist object
 
             # Add the new peak to the motor unit pulses
@@ -671,6 +678,9 @@ class EditMU:
             )
 
         # Refresh the canvas to reflect changes
+        self.plot_discharge_rate()
+        current_xlim = self.ax2.get_xlim()
+        self.ax1.set_xlim(current_xlim)
         self.fig.canvas.draw_idle()
 
 
@@ -733,6 +743,9 @@ class EditMU:
 
             # Update the figure with the remaining peaks
             self.plot_peaks()
+            self.plot_discharge_rate()
+            current_xlim = self.ax2.get_xlim()
+            self.ax1.set_xlim(current_xlim)
             self.fig.canvas.draw_idle()
     
     def recalc_filter(self, event):
@@ -890,30 +903,9 @@ class EditMU:
             "Click and Drag: Select region for new peaks"
         )
         self.ax1.text(
-            -0.15, 1.14, instructions, transform=self.ax1.transAxes,
-            fontsize=10, verticalalignment="top"
+            0.015, 0.98, instructions, transform=self.ax1.transAxes,
+            fontsize=11, verticalalignment="top"
         )
-
-    def plot_reference_signal(self):
-        """
-        Plot the reference signal on a secondary y-axis.
-
-        This method creates a secondary y-axis on the current plot to display the reference signal.
-        The reference signal is plotted against the same x-axis as the primary data, with the y-axis
-        label set to 'MVC'.
-
-        The x-axis values are determined based on the `fsamp` and `timeinseconds` attributes.
-
-        """
-        ax2 = self.ax1.twinx()
-        xref = (
-            self.emgfile["REF_SIGNAL"].index / self.fsamp
-            if self.timeinseconds
-            else self.emgfile["REF_SIGNAL"].index
-        )
-        sns.lineplot(x=xref, y=self.emgfile["REF_SIGNAL"][0], color="0.4", ax=ax2)
-        ax2.set_ylabel("MVC")
-
 
     def save_EMG_decomposition(self):
         """
