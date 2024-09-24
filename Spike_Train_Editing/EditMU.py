@@ -110,8 +110,14 @@ class EditMU:
         self.fig, (self.ax1, self.ax2) = plt.subplots(
             2, 1,  # Two rows, one column
             figsize=(figsize[0] / 2.54, figsize[1] / 2.54),  # Convert cm to inches
-            num="IPTS"  # Figure title or window name
+            num="IPTS" # Figure title or window name
         )
+
+        self.fig.subplots_adjust(
+        top=0.9,  # Adjust the upper limit of the top plot (less far up)
+        bottom=0.1,  # Keep the bottom position
+        hspace=0.4  # Adjust the space between the plots
+)
 
         # Set shared x-axis for the subplots
         self.ax1.get_shared_x_axes().joined(self.ax1, self.ax2)
@@ -178,12 +184,12 @@ class EditMU:
         3. Optionally add the reference signal to the plot.
         """
 
+        # Plot IPTS data (bottom subplot)
+        self.plot_ipts()
+
         # Plot discharge rate (top subplot)
         self.plot_discharge_rate()
         self.add_instructions()
-
-        # Plot IPTS data (bottom subplot)
-        self.plot_ipts()
 
         # Optionally add reference signal to the bottom subplot
         self.add_ref_signal()
@@ -240,8 +246,11 @@ class EditMU:
             time_pulses = mu_pulses[1:] / self.emgfile['FSAMP'] if self.timeinseconds else mu_pulses[1:]
 
             # Plot discharge rate as a scatter plot in the top subplot
-            self.ax1.scatter(time_pulses, discharge_rate, color='blue', label="Discharge Rate (Pulses/Sec)")
+            self.ax1.scatter(time_pulses, discharge_rate, edgecolor='blue', facecolors='none', marker='o', s=40)
             self.ax1.set_ylabel("Discharge Rate (Pulses/Sec)")
+            current_xlim = self.ax2.get_xlim()
+            self.ax1.set_xlim(current_xlim)
+            self.ax1.set_ylim((0,1.3*max(discharge_rate)))
             
         else:
             self.ax1.text(0.5, 0.5, 'Not enough pulses for rate calculation', transform=self.ax1.transAxes, 
@@ -258,13 +267,22 @@ class EditMU:
                 if self.timeinseconds
                 else self.emgfile["REF_SIGNAL"].index
             )
+            
+            # Plot the reference signal with light grey color and thinner line
             sns.lineplot(
                 x=xref,
                 y=self.emgfile["REF_SIGNAL"][0],
-                color="0.4",
+                color="silver",  # Set color to light grey
                 ax=ax3,
+                linewidth=1,  # Make the line thinner
+                alpha=1  # Set transparency to ensure it's in the background
             )
-            ax3.set_ylabel("MVC")
+
+            # Hide the right y-axis
+            ax3.set_ylabel("")  # Remove y-axis label
+            ax3.spines['right'].set_visible(False)  # Hide right spine
+            ax3.yaxis.set_visible(False)  # Hide y-axis ticks and label
+
 
     def plot_peaks(self):
         """
@@ -744,8 +762,6 @@ class EditMU:
             # Update the figure with the remaining peaks
             self.plot_peaks()
             self.plot_discharge_rate()
-            current_xlim = self.ax2.get_xlim()
-            self.ax1.set_xlim(current_xlim)
             self.fig.canvas.draw_idle()
     
     def recalc_filter(self, event):
@@ -903,7 +919,7 @@ class EditMU:
             "Click and Drag: Select region for new peaks"
         )
         self.ax1.text(
-            0.015, 0.98, instructions, transform=self.ax1.transAxes,
+            0.75, 0.98, instructions, transform=self.ax1.transAxes,
             fontsize=11, verticalalignment="top"
         )
 
