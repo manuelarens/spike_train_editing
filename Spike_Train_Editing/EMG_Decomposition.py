@@ -1,8 +1,6 @@
 from EMG_classes import offline_EMG
-import glob
 import os
 import numpy as np
-import pandas as pd
 
 
 class EMGDecomposition:

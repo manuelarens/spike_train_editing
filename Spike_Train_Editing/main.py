@@ -126,7 +126,7 @@ def edit_decomposed_mu(filepath_decomp):
     emgfile = emg.sort_mus(emgfile)  # Sort motor units by discharge time
 
     # Plot the motor unit pulses
-    emg.plot_mupulses(emgfile)
+    #emg.plot_mupulses(emgfile)
 
     # Open the editor to manually adjust peaks
     mu_editor = EditMU(emgfile, filepath_decomp)

@@ -30,7 +30,7 @@ class EditMU:
         filepath,
         addrefsig=False,
         timeinseconds=True,
-        figsize=(20, 15),
+        figsize=(30, 15),
         showimmediately=True,
         tight_layout=False,
     ):
@@ -87,6 +87,8 @@ class EditMU:
         # Initialize the current MU index
         self.current_index = 0
 
+        self.addrefsig = 1
+
         self.edited_dict = {}
 
         self.grid_name = ['4-8-L']
@@ -141,6 +143,9 @@ class EditMU:
 
         # Show layout
         showgoodlayout(self.tight_layout, despined="2yaxes" if addrefsig else False)
+
+        manager = plt.get_current_fig_manager()
+        manager.full_screen_toggle()
 
         # Show the plot immediately if needed
         if showimmediately:
@@ -234,6 +239,27 @@ class EditMU:
 
         # Add instructions
         self.add_instructions()
+
+        # Optional reference signal
+        if self.addrefsig:
+            ax2 = self.ax1.twinx()
+            xref = (
+                self.emgfile["REF_SIGNAL"].index / self.emgfile["FSAMP"]
+                if self.timeinseconds
+                else self.emgfile["REF_SIGNAL"].index
+            )
+            sns.lineplot(
+                x=xref,
+                y=self.emgfile["REF_SIGNAL"][0],
+                color="0.4",
+                ax=ax2,
+            )
+            ax2.set_ylabel("MVC")
+        
+        self.ax1.set_position([0.05, 0.1, 0.75, 0.75])
+
+        tight_layout = 1
+        showgoodlayout(tight_layout, despined="2yaxes" if self.addrefsig else False)
 
 
     def plot_peaks(self):
@@ -770,10 +796,7 @@ class EditMU:
             np.ndarray: Array of detected spikes based on the recalculated pulse train.
         """
         # Initialize EMG object and prepare the data
-        emg_obj = RecalcFilter()
-
-        emg_obj.convert_dict(self.emgfile, grid_names=self.grid_name)  # Converts MATLAB output to EMG object format
-        emg_obj.grid_formatter()  # Adds spatial context to the EMG object
+        emg_obj = RecalcFilter(self.emgfile, self.grid_name)
 
         emg = emg_obj.signal_dict["data"]
         extension_factor = int(np.round(emg_obj.ext_factor / len(emg)))

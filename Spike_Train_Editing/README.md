@@ -14,8 +14,10 @@ This project handles EMG (Electromyography) data processing, including EMG signa
 
 - **main.py**: The main script that runs the full EMG decomposition and editing workflow. Run this script and select file to be decomposed and edit the decomposition.
 - **EditMU.py**: Contains the `EditMU` class, which provides the interface for manually editing motor unit peaks.
-- **EMG_Decomposition.py**: Handles the offline EMG decomposition process, using a defined grid type for motor unit extraction.
+- **EMG_Decomposition.py**: Contains the `EMGDecomposition` class, which handles the offline EMG decomposition process given a .poly5/.xdf file.
 - **EMG_classes.py**: Defines the EMG-related classes and utilities used throughout the project.
+- **RecalcFilter.py**: Contains the `RecalcFilter` class, used to recalculate the filter for the current motor unit
+- **processing_tools.py** Contains helper functions
 
 ## Prerequisites
 

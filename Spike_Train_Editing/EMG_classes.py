@@ -1,23 +1,16 @@
-import glob, os, scipy
-import xml.etree.ElementTree as ET
-import tarfile as tf
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from processing_tools import *
 import tkinter as tk
 from tkinter import simpledialog
-from tkinter import filedialog 
 
 from scipy.signal import detrend
-from scipy import io
-import time
-from tqdm import tqdm
+from scipy.io import loadmat
 import pandas as pd 
 import json 
 import tkinter as tk
 import gzip 
-from os.path import join, dirname, realpath 
-import sys
 from TMSiFileFormats.file_readers import Xdf_Reader
 from Test_Scripts_Nathan.poly5_force_file_reader import Poly5Reader
 # root = tk.Tk()
@@ -50,11 +43,6 @@ class EMG():
         self.dup_thr = 0.3 # Threshold that defines the minimal percentage of common discharge times between duplicated motor units
         self.cov_dr = 0.3 # Threshold that define the CoV of discharge that we aim to reach, if we refine the MUs (i.e. refineMU = 1)
 
-
-#######################################################################################################
-########################################## OFFLINE EMG ################################################
-#######################################################################################################
-
 class offline_EMG(EMG):
 
     # child class of EMG, so will inherit it's initialisaiton
@@ -74,7 +62,7 @@ class offline_EMG(EMG):
         self.filename = os.path.splitext(base)[0] # get the name of the file without the extension 
         
     def convert(self): # input file: Matlabfile (build on output of ISpin)
-        signal_mat = io.loadmat(self.filepath)['signal'] #from .mat, import only the struct 'signal'
+        signal_mat = loadmat(self.filepath)['signal'] #from .mat, import only the struct 'signal'
         """get sample frequency, number of channels, grids and muscle names, the EMG signal, 
         the target and the path of the force profile """
         # specify fields of the dataset 
