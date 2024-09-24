@@ -21,7 +21,7 @@ from sklearn.cluster import KMeans
 from openhdemg.library.mathtools import compute_sil
 from openhdemg.library.plotemg import showgoodlayout
 from RecalcFilter import RecalcFilter
-from processing_tools import get_binary_pulse_trains, whiteesig, extend_emg, pcaesig, detect_peaks, maxk
+from processing_tools import get_binary_pulse_trains, whiteesig, extend_emg, pcaesig, detect_peaks, maxk, bandpass_filter
 
 class EditMU:
     def __init__(
@@ -110,6 +110,7 @@ class EditMU:
         self.fig, (self.ax1, self.ax2) = plt.subplots(
             2, 1,  # Two rows, one column
             figsize=(figsize[0] / 2.54, figsize[1] / 2.54),  # Convert cm to inches
+         
             num="IPTS" # Figure title or window name
         )
 
@@ -210,29 +211,6 @@ class EditMU:
         # Plot peaks on the bottom subplot
         self.plot_peaks()
 
-        # Compute and display SIL
-        self.sil_new[self.current_index] = compute_sil(
-            self.ipts[self.current_index],
-            self.emgfile["MUPULSES"][self.current_index]
-        )
-
-        # Handle SIL color and difference text logic
-        if not self.sil_recalculated[self.current_index]:
-            self.sil_color = 'black'
-            sil_dif_text = ""
-        else:
-            sil_dif = self.sil_new[self.current_index] - self.sil_old[self.current_index]
-            sil_dif_text = f' (Δ = {sil_dif:.5f})'
-            self.sil_color = 'limegreen' if sil_dif > 0 else 'red' if sil_dif < 0 else 'black'
-
-        self.sil_old[self.current_index] = self.sil_new[self.current_index]
-
-        self.ax1.text(
-            0.41, 1, f"SIL = {self.sil_new[self.current_index]:.6f}{sil_dif_text}",
-            ha="left", va="center", transform=self.ax1.transAxes,
-            fontsize=13, fontweight="bold", color=self.sil_color
-        )
-
     def plot_discharge_rate(self):
         """
         Plot the instantaneous discharge rate on the top subplot.
@@ -251,6 +229,29 @@ class EditMU:
             current_xlim = self.ax2.get_xlim()
             self.ax1.set_xlim(current_xlim)
             self.ax1.set_ylim((0,1.3*max(discharge_rate)))
+
+            # Compute and display SIL
+            self.sil_new[self.current_index] = compute_sil(
+                self.ipts[self.current_index],
+                self.emgfile["MUPULSES"][self.current_index]
+            )
+
+            # Handle SIL color and difference text logic
+            if not self.sil_recalculated[self.current_index]:
+                self.sil_color = 'black'
+                sil_dif_text = ""
+            else:
+                sil_dif = self.sil_new[self.current_index] - self.sil_old[self.current_index]
+                sil_dif_text = f' (Δ = {sil_dif:.5f})'
+                self.sil_color = 'limegreen' if sil_dif > 0 else 'red' if sil_dif < 0 else 'black'
+
+            self.sil_old[self.current_index] = self.sil_new[self.current_index]
+
+            self.ax1.text(
+                0.41, 1, f"SIL = {self.sil_new[self.current_index]:.6f}{sil_dif_text}",
+                ha="left", va="center", transform=self.ax1.transAxes,
+                fontsize=13, fontweight="bold", color=self.sil_color
+            )
             
         else:
             self.ax1.text(0.5, 0.5, 'Not enough pulses for rate calculation', transform=self.ax1.transAxes, 
@@ -275,7 +276,7 @@ class EditMU:
                 color="silver",  # Set color to light grey
                 ax=ax3,
                 linewidth=1,  # Make the line thinner
-                alpha=1  # Set transparency to ensure it's in the background
+                alpha=0.9  # Set transparency to ensure it's in the background
             )
 
             # Hide the right y-axis
@@ -436,32 +437,33 @@ class EditMU:
         The canvas is updated to reflect the addition of the buttons.
         """
         # Define button colors
-        self.button_color = "ivory"
+        self.button_color = "whitesmoke"
+        self.hover_color = "lightgray"
         self.button_active_color = "mistyrose"
 
         # Create and position "Previous" button
         ax_prev = plt.axes([0.01, 0.025, 0.12, 0.04])
-        self.btn_prev = Button(ax_prev, "Previous", color=self.button_color)
+        self.btn_prev = Button(ax_prev, "Previous", color=self.button_color, hovercolor=self.hover_color)
         self.btn_prev.on_clicked(self.previous_mu)  # Link button to method
 
         # Create and position "Next" button
         ax_next = plt.axes([0.87, 0.025, 0.12, 0.04])
-        self.btn_next = Button(ax_next, "Next", color=self.button_color)
+        self.btn_next = Button(ax_next, "Next", color=self.button_color, hovercolor=self.hover_color)
         self.btn_next.on_clicked(self.next_mu)  # Link button to method
 
         # Create and position "Add spikes" button
         ax_add = plt.axes([0.08, 0.51, 0.19, 0.04])
-        self.btn_add = Button(ax_add, "Add spikes", color=self.button_color)
+        self.btn_add = Button(ax_add, "Add spikes", color=self.button_color, hovercolor=self.hover_color)
         self.btn_add.on_clicked(self.add_spikes)  # Link button to method
 
         # Create and position "Remove spikes" button
         ax_remove = plt.axes([0.3, 0.51, 0.19, 0.04])
-        self.btn_remove = Button(ax_remove, "Remove spikes", color=self.button_color)
+        self.btn_remove = Button(ax_remove, "Remove spikes", color=self.button_color, hovercolor=self.hover_color)
         self.btn_remove.on_clicked(self.remove_spikes)  # Link button to method
 
         # Create and position "Recalc. filter" button
         ax_recalc = plt.axes([0.52, 0.51, 0.19, 0.04])
-        self.btn_recalc = Button(ax_recalc, "Recalc. filter", color=self.button_color)
+        self.btn_recalc = Button(ax_recalc, "Recalc. filter", color=self.button_color, hovercolor=self.hover_color)
         self.btn_recalc.on_clicked(self.recalc_filter)  # Link button to method
 
         # Create and position "Delete MU" button with distinct color
@@ -828,6 +830,8 @@ class EditMU:
         emg_obj = RecalcFilter(self.emgfile, self.grid_name)
 
         emg = emg_obj.signal_dict["data"]
+        emg = bandpass_filter(emg, emg_obj.signal_dict['fsamp'],emg_type = 0)  
+
         extension_factor = int(np.round(emg_obj.ext_factor / len(emg)))
         emg_obj.signal_dict['extend_obvs_old'] = np.zeros([
             1, np.shape(emg)[0] * extension_factor, np.shape(emg)[1] + extension_factor - 1 - emg_obj.differential_mode
