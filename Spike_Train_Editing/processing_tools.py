@@ -324,6 +324,7 @@ def pcaesig(signal):
 
     # Calculate the rank tolerance (regularization factor)
     rank_tolerance = np.mean(eigenvalues[len(eigenvalues) // 2:])
+    #print(f'Rank tolerance {rank_tolerance}')
     
     # If rank tolerance is negative, set it to 0
     if rank_tolerance < 0:
@@ -331,6 +332,7 @@ def pcaesig(signal):
     
     # Determine the cutoff for significant eigenvalues
     max_last_eig = np.sum(eigenvalues > rank_tolerance)
+    #print(f'Rank tolerance {max_last_eig}')
     
     if max_last_eig < signal.shape[0]:
         lower_limit_value = (eigenvalues[max_last_eig - 1] + eigenvalues[max_last_eig]) / 2
@@ -343,6 +345,13 @@ def pcaesig(signal):
     # Select eigenvectors and eigenvalues
     E = eigenvectors[:, significant_indices]
     D = np.diag(eigenvalues[significant_indices])
+
+    # Sort E and D to return in ascending order of eigenvalues
+    sorted_indices = np.argsort(eigenvalues[significant_indices])  # Sort by selected eigenvalues
+    E = E[:, sorted_indices]  # Reorder eigenvectors
+    D = D[sorted_indices][:, sorted_indices]  # Reorder diagonal matrix of eigenvalues
+
+    print(f'Diagonal eigenvalues in ascending order: {D[:5,:5]}')
     
     return E, D
 

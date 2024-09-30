@@ -93,6 +93,11 @@ class EditMU:
 
         self.grid_name = ['4-8-L']
 
+        self.emg = None
+        self.iReSIGt = None
+        self.dewhiteningMatrix = None
+        self.eSIG = None
+
         # Initialize additional attributes
         self.peak_artists = []
         self.sil_recalculated = [False] * len(emgfile['MUPULSES'])
@@ -103,7 +108,7 @@ class EditMU:
             self.emgfile["MUPULSES"][i]
         )
 
-        self.sil_new = np.zeros(len(emgfile['MUPULSES']))
+        self.sil_new = np.copy(self.sil_old)
         self.sil_color = 'black'
 
         # Create the figure and two subplots (ax1 and ax2 stacked vertically)
@@ -228,22 +233,30 @@ class EditMU:
             self.ax1.set_ylabel("Discharge Rate (Pulses/Sec)")
             current_xlim = self.ax2.get_xlim()
             self.ax1.set_xlim(current_xlim)
-            self.ax1.set_ylim((0,1.3*max(discharge_rate)))
-
-            # Compute and display SIL
-            self.sil_new[self.current_index] = compute_sil(
-                self.ipts[self.current_index],
-                self.emgfile["MUPULSES"][self.current_index]
-            )
+            self.ax1.set_ylim((0,2*max(discharge_rate)))
 
             # Handle SIL color and difference text logic
             if not self.sil_recalculated[self.current_index]:
                 self.sil_color = 'black'
                 sil_dif_text = ""
             else:
+                # Compute and display SIL
+                self.sil_new[self.current_index] = compute_sil(
+                    self.ipts[self.current_index],
+                    self.emgfile["MUPULSES"][self.current_index]
+                )
                 sil_dif = self.sil_new[self.current_index] - self.sil_old[self.current_index]
                 sil_dif_text = f' (Δ = {sil_dif:.5f})'
-                self.sil_color = 'limegreen' if sil_dif > 0 else 'red' if sil_dif < 0 else 'black'
+                if sil_dif > 0.02:
+                    self.sil_color = 'limegreen'  # Large positive difference
+                elif 0 < sil_dif <= 0.02:
+                    self.sil_color = 'lightgreen'  # Small positive difference
+                elif sil_dif == 0:
+                    self.sil_color = 'black'  # No difference
+                elif -0.02 <= sil_dif < 0:
+                    self.sil_color = 'lightcoral'  # Small negative difference
+                else:
+                    self.sil_color = 'red'  # Large negative difference
 
             self.sil_old[self.current_index] = self.sil_new[self.current_index]
 
@@ -828,28 +841,56 @@ class EditMU:
         """
         # Initialize EMG object and prepare the data
         emg_obj = RecalcFilter(self.emgfile, self.grid_name)
+        print(f'shape raw signal {self.emgfile["RAW_SIGNAL"].shape}')
 
-        emg = emg_obj.signal_dict["data"]
-        emg = bandpass_filter(emg, emg_obj.signal_dict['fsamp'],emg_type = 0)  
+        if self.emg is None:
+            self.emg = emg_obj.signal_dict["data"]
 
-        extension_factor = int(np.round(emg_obj.ext_factor / len(emg)))
-        emg_obj.signal_dict['extend_obvs_old'] = np.zeros([
-            1, np.shape(emg)[0] * extension_factor, np.shape(emg)[1] + extension_factor - 1 - emg_obj.differential_mode
-        ])
+            self.emg = bandpass_filter(self.emg, emg_obj.signal_dict['fsamp'],emg_type = 0)  
+            print(f'emg first 10 = {self.emg[0,:10]}')
+            print(f'emg last 10 = {self.emg[0,-10:]}')
 
+
+            extension_factor =  round(np.round(emg_obj.ext_factor / len(self.emg)))
+        
+            emg_obj.signal_dict['extend_obvs_old'] = np.zeros([
+                1, np.shape(self.emg)[0] * extension_factor, np.shape(self.emg)[1] + extension_factor - 1 - emg_obj.differential_mode
+            ])
+            print(f"shape before {np.shape(emg_obj.signal_dict['extend_obvs_old'])}")
+            self.eSIG = extend_emg(emg_obj.signal_dict['extend_obvs_old'][0], self.emg, extension_factor)
+            print(f'eSIG last 5x5: {self.eSIG[-6:,-6:]}')
+            ReSIG = np.matmul(self.eSIG, self.eSIG.T) / len(self.eSIG)
+            self.iReSIGt = np.linalg.pinv(ReSIG)
+            E, D = pcaesig(self.eSIG)
+            #print(f'Shape D = {np.shape(D)}\n D = {D[0,:6]}')
+            ##################### wsig, esig, E, D, dewhitening correct
+
+            
+            
+            self.wSIG, _, self.dewhiteningMatrix = whiteesig(self.eSIG, E, D)
+            print(f"First 5x5 dewhite {self.dewhiteningMatrix[:5,:5]}")
+            print(f'wsig first 5x5: {self.wSIG[:5, :5]}')
+            print(f'wsig last 5x5: {self.wSIG[-6:, -6:]}')
+
+            print(f'ipts indices 25223-25225: {self.ipts[self.current_index][25223:25226]}')
+
+        
         # Prepare EMG signal and calculate pulse train according to MUedit
-        spikes = self.emgfile["MUPULSES"][self.current_index]
-        eSIG = extend_emg(emg_obj.signal_dict['extend_obvs_old'][0], emg, extension_factor)
+        spikes = np.zeros(len(self.emgfile["MUPULSES"][self.current_index]))
+        spikes = np.array([int(val - 1) for val in self.emgfile["MUPULSES"][self.current_index]], dtype=int)
+        print(f'First 10 spikes {spikes[:10]}')
+        
+        wSIG_selected = self.wSIG[:, spikes]
+        print(f"Shape wsig selected {np.shape(wSIG_selected)}")
+        print(f'wsig selected: {wSIG_selected[:5,:5]}')
 
-        ReSIG = np.matmul(eSIG, eSIG.T) / len(eSIG)
-        iReSIGt = np.linalg.pinv(ReSIG)
-        E, D = pcaesig(eSIG)
-        wSIG, _, dewhiteningMatrix = whiteesig(eSIG, E, D)
-        wSIG_selected = wSIG[:, spikes]
         MUFilters = np.sum(wSIG_selected, axis=1)
+        print(f"shape MUFilters {np.shape(MUFilters)}")
+        print(f"First 10 MUFilters {MUFilters[:10]}")
+        #print(MUFilters)
 
-        Pt = ((dewhiteningMatrix @ MUFilters).T @ iReSIGt) @ eSIG
-        Pt = Pt[:len(emg[0])]  # Adjust the length to match the original EMG signal
+        Pt = ((self.dewhiteningMatrix @ MUFilters).T @ self.iReSIGt) @ self.eSIG
+        Pt = Pt[:len(self.emg[0])]  # Adjust the length to match the original EMG signal
 
         # Post-process the pulse train
         Pt[:round(0.1 * emg_obj.sample_rate)] = 0
@@ -863,9 +904,24 @@ class EditMU:
         # Scale according to 10 biggest peaks
         Pt /= np.mean(maxk(Pt, 10))
 
+        #print(Pt(spikes) - self.emgfile["IPTS"][self.current_index](spikes))
+        #Pt = np.pad(Pt, (0, 2))
+
+        print(f'Shape Pt as pd df{Pt.shape}')
+
         # Save new pulse train
-        self.emgfile["IPTS"][self.current_index] = np.pad(Pt, (0, 4))
-        self.ipts[self.current_index] = self.emgfile["IPTS"][self.current_index] 
+        self.emgfile["IPTS"].iloc[:, self.current_index] = Pt
+        print(f'Shape of self.ipts {self.ipts[self.current_index].shape}')
+        print(f'10 of self.ipts {self.ipts[self.current_index].iloc[10000:10010]}')
+
+        print(f'10 of Pt {Pt[10000:10010]}')
+
+        print(self.emgfile["IPTS"])
+
+
+        print(np.allclose(self.emgfile["IPTS"][self.current_index], self.ipts[self.current_index]))
+
+        self.ipts[self.current_index] = self.emgfile["IPTS"][self.current_index]
 
         return spikes
 
@@ -886,7 +942,7 @@ class EditMU:
             spikes (np.ndarray): Array of spike indices to be processed.
         """
         # Access the current motor unit's pulse train and IPTS data
-        Pt = self.ipts[self.current_index]
+        Pt = self.emgfile["IPTS"][self.current_index]
         
         # Select pulse values corresponding to the provided spike indices
         pulse_values = np.array(Pt[spikes])
@@ -897,6 +953,10 @@ class EditMU:
         # Determine the cluster with the highest centroid
         spikes_ind = np.argmax(kmeans.cluster_centers_)
         spikes2 = spikes[np.where(kmeans.labels_ == spikes_ind)]
+
+        print(f'First 10 spikes {spikes2[:10]}')
+
+        #print(Pt(spikes2) - self.emgfile["IPTS"][self.current_index](spikes2))
         
         # Optionally remove outliers
         """
@@ -908,6 +968,7 @@ class EditMU:
         
         # Update the MUPULSES with the filtered spikes
         self.emgfile["MUPULSES"][self.current_index] = spikes2
+
 
         
     def add_instructions(self):
