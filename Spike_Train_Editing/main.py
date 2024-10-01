@@ -24,9 +24,8 @@ sys.path.append(MODULES_DIR)  # Add modules directory to system path for importi
 # Now import the modules that depend on the path
 from processing_tools import emg_from_json
 from EMG_Decomposition import EMGDecomposition
-from TMSiFileFormats.file_readers import Poly5Reader
 from EditMU import EditMU
-
+from TMSiFileFormats.file_readers import Poly5Reader
 
 GRID_TYPE = '4-8-L'
 
@@ -43,7 +42,7 @@ def main():
     """
     filepath = filedialog.askopenfilename(
         title='Select data file',
-        filetypes=(('Data files (.poly5, .xdf)', '*.poly5 *.xdf'), ('All files', '*.*')),
+        filetypes=(('Data files (.poly5)', '*.poly5'), ('All files', '*.*')),
         initialdir=MEASUREMENTS_DIR
     )
     #"""
@@ -55,8 +54,8 @@ def main():
         sys.exit()
 
     # Display the raw EMG file using MNE
-    display_raw_emg(filepath)
-    filepath_decomp = run_offline_decomposition(filepath)
+    rejected_chan = display_raw_emg(filepath)
+    filepath_decomp = run_offline_decomposition(filepath, rejected_chan)
     #"""
 
 
@@ -95,10 +94,13 @@ def display_raw_emg(filepath):
         scalings=dict(eeg=250e-6),
         start=0, duration=5, n_channels=5,
         title=filepath, block=True
+
     )
+    
+    return data_object.info['bads']
 
 
-def run_offline_decomposition(filepath):
+def run_offline_decomposition(filepath, rejected_chan):
     """
     Function to run offline EMG decomposition on the selected file.
     Decomposed motor units are saved in a JSON file for further processing.
@@ -106,7 +108,7 @@ def run_offline_decomposition(filepath):
     print('START OFFLINE DECOMPOSITION')
 
     # Create EMG decomposition object and run the decomposition process
-    offline_decomp = EMGDecomposition(filepath=filepath)
+    offline_decomp = EMGDecomposition(filepath=filepath, rejected_chan = rejected_chan)
     offline_decomp.run(grid_name=GRID_TYPE)
 
     # Get the path to the saved decomposed JSON file
@@ -126,11 +128,11 @@ def edit_decomposed_mu(filepath_decomp):
     emgfile = emg.sort_mus(emgfile)  # Sort motor units by discharge time
 
     # Plot the motor unit pulses
-    #emg.plot_mupulses(emgfile)
+    emg.plot_mupulses(emgfile)
 
     # Open the editor to manually adjust peaks
     mu_editor = EditMU(emgfile, filepath_decomp)
-    
+
     # Save the edited motor units back to a file
     filepath_decomp_edited = mu_editor.save_EMG_decomposition()
 

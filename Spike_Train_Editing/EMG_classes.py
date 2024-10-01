@@ -166,8 +166,10 @@ class offline_EMG(EMG):
                                 [2, 10, 21, 29], 
                                 [1, 9, 22, 30], 
                                 [0, 8, 23, 31]]
+                self.rejected_chan = convert_channel_names_to_indices(self.rejected_chan, ElChannelMap)
+
                 rejected_channels = np.zeros([self.signal_dict['ngrids'],32])
-                rejected_channels[0, self.rejected_chan] = 1
+                rejected_channels[i, self.rejected_chan] = 1
                 IED = 8.75
                 self.emg_type = 0 # surface HD EMG 
                 
@@ -181,8 +183,10 @@ class offline_EMG(EMG):
                                 [8, 9, 10, 11, 52, 53, 54, 55],
                                 [4, 5, 6, 7, 56, 57, 58, 59],
                                 [0, 1, 2, 3, 60, 61, 62, 63]]
+                self.rejected_chan = convert_channel_names_to_indices(self.rejected_chan, ElChannelMap)
+
                 rejected_channels = np.zeros([self.signal_dict['ngrids'],64])
-                rejected_channels[0, self.rejected_chan] = 1
+                rejected_channels[i, self.rejected_chan] = 1
                 IED = 8.75
                 self.emg_type = 0 # surface HD EMG 
                                  
@@ -297,7 +301,7 @@ class offline_EMG(EMG):
         self.rejected_channels = rejected_channels
         self.ied = IED
         self.coordinates = coordinates
-        
+       
     def manual_rejection(self):
         # NOTE: DID NOT CHECK THIS FUNCTION, TO DO: TEST/ADJUST FUNCTION
         """ Manual rejection for channels with noise/artificats by inspecting plots of the grid channels """
@@ -635,7 +639,6 @@ class offline_EMG(EMG):
             # maxlag = round(fsamp)/40
             # jitter = 0.0025
             pulse_trains, discharge_times_new, MU_filters_new = remove_duplicates(self.decomp_dict['MU_filters'], pulse_trains, discharge_times, discharge_times_aligned, round(self.signal_dict['fsamp']/40), 0.00025, self.signal_dict['fsamp'], self.dup_thr)
-            print(np.shape(MU_filters_new))
             self.decomp_dict['MU_filters'][0] = MU_filters_new
 
             # if we want further automatic refinement of MUs, prior to manual edition
@@ -747,3 +750,4 @@ class offline_EMG(EMG):
             compresslevel=4
         ) as f:
             json.dump(emgfile, f)
+

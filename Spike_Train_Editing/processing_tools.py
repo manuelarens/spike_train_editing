@@ -350,8 +350,6 @@ def pcaesig(signal):
     sorted_indices = np.argsort(eigenvalues[significant_indices])  # Sort by selected eigenvalues
     E = E[:, sorted_indices]  # Reorder eigenvectors
     D = D[sorted_indices][:, sorted_indices]  # Reorder diagonal matrix of eigenvalues
-
-    print(f'Diagonal eigenvalues in ascending order: {D[:5,:5]}')
     
     return E, D
 
@@ -1345,3 +1343,32 @@ def emg_from_json(filepath):
         raise Exception("\nFile source not recognised\n")
 
     return emgfile
+
+def convert_channel_names_to_indices(channel_names, ElChannelMap):
+        """
+        Convert list of channel names (e.g., ['R1C8', 'R2C1']) to integers based on ElChannelMap.
+
+        Parameters
+        ----------
+        channel_names : list of str
+            List of channel names formatted as 'R1C8', 'R2C1', etc.
+        ElChannelMap : list of list of int
+            2D list that maps row-column to integer values.
+
+        Returns
+        -------
+        list of int
+            List of integers corresponding to the channel names.
+        """
+        channel_indices = []
+
+        for ch_name in channel_names:
+            # Extract the row and column numbers from the channel name
+            row = int(ch_name[1]) - 1  # Convert R1 -> row index 0
+            col = int(ch_name[3])   # Convert C1 -> column index 0
+            
+            # Get the corresponding index from the ElChannelMap
+            channel_index = ElChannelMap[-col][row]
+            channel_indices.append(channel_index)
+
+        return channel_indices

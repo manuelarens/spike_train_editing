@@ -97,6 +97,7 @@ class EditMU:
         self.iReSIGt = None
         self.dewhiteningMatrix = None
         self.eSIG = None
+        self.wSIG = None
 
         # Initialize additional attributes
         self.peak_artists = []
@@ -143,6 +144,8 @@ class EditMU:
         self.remove_spikes_boolean = False
         self.add_spikes_boolean = False
 
+        self.file_path_json = ''
+
         # Plot the initial MU
         self.plot_current_mu()
 
@@ -152,10 +155,6 @@ class EditMU:
 
         # Add previous and next buttons
         self.add_buttons()
-
-        # Plot reference signal if needed
-        if addrefsig:
-            self.plot_reference_signal()
 
         # Show layout
         showgoodlayout(self.tight_layout, despined="2yaxes" if addrefsig else False)
@@ -198,7 +197,8 @@ class EditMU:
         self.add_instructions()
 
         # Optionally add reference signal to the bottom subplot
-        self.add_ref_signal()
+        if self.addrefsig:
+            self.add_ref_signal()
 
         # Adjust layout to avoid overlap
         self.fig.tight_layout()
@@ -221,7 +221,7 @@ class EditMU:
         Plot the instantaneous discharge rate on the top subplot.
         """
         self.ax1.clear()  # Clear previous plot on the top subplot
-        mu_pulses = self.emgfile['MUPULSES'][self.current_index]
+        mu_pulses = self.emgfile['MUPULSES'][self.current_index] # Get pulses of current MU
         
         if len(mu_pulses) > 1:
             discharge_intervals = np.diff(mu_pulses) / self.emgfile['FSAMP']  # Convert to seconds
@@ -258,8 +258,10 @@ class EditMU:
                 else:
                     self.sil_color = 'red'  # Large negative difference
 
+            # Store new value for next comparison
             self.sil_old[self.current_index] = self.sil_new[self.current_index]
 
+            # Add current SIL value
             self.ax1.text(
                 0.41, 1, f"SIL = {self.sil_new[self.current_index]:.6f}{sil_dif_text}",
                 ha="left", va="center", transform=self.ax1.transAxes,
@@ -274,28 +276,28 @@ class EditMU:
         """
         Plot the reference signal on a secondary y-axis of the bottom subplot.
         """
-        if self.addrefsig:
-            ax3 = self.ax2.twinx()  # Create a twin y-axis on the bottom subplot
-            xref = (
-                self.emgfile["REF_SIGNAL"].index / self.emgfile["FSAMP"]
-                if self.timeinseconds
-                else self.emgfile["REF_SIGNAL"].index
-            )
-            
-            # Plot the reference signal with light grey color and thinner line
-            sns.lineplot(
-                x=xref,
-                y=self.emgfile["REF_SIGNAL"][0],
-                color="silver",  # Set color to light grey
-                ax=ax3,
-                linewidth=1,  # Make the line thinner
-                alpha=0.9  # Set transparency to ensure it's in the background
-            )
+        
+        ax3 = self.ax2.twinx()  # Create a twin y-axis on the bottom subplot
+        xref = (
+            self.emgfile["REF_SIGNAL"].index / self.emgfile["FSAMP"]
+            if self.timeinseconds
+            else self.emgfile["REF_SIGNAL"].index
+        )
+        
+        # Plot the reference signal with light grey color and thinner line
+        sns.lineplot(
+            x=xref,
+            y=self.emgfile["REF_SIGNAL"][0],
+            color="silver",  # Set color to light grey
+            ax=ax3,
+            linewidth=1,  # Make the line thinner
+            alpha=0.9  # Set transparency to ensure it's in the background
+        )
 
-            # Hide the right y-axis
-            ax3.set_ylabel("")  # Remove y-axis label
-            ax3.spines['right'].set_visible(False)  # Hide right spine
-            ax3.yaxis.set_visible(False)  # Hide y-axis ticks and label
+        # Hide the right y-axis
+        ax3.set_ylabel("")  # Remove y-axis label
+        ax3.spines['right'].set_visible(False)  # Hide right spine
+        ax3.yaxis.set_visible(False)  # Hide y-axis ticks and label
 
 
     def plot_peaks(self):
@@ -537,7 +539,7 @@ class EditMU:
             self.sil_old = np.delete(self.sil_old, self.current_index)
             self.sil_new = np.delete(self.sil_new, self.current_index)
 
-            # Update the current index to the last valid motor unit
+            # Update the current index to the last valid motor unit if beyond limit
             if self.current_index >= len(self.emgfile['MUPULSES']):
                 self.current_index = len(self.emgfile['MUPULSES']) - 1
                 if self.current_index == -1:
@@ -823,11 +825,10 @@ class EditMU:
         # Reset button color after recalculation
         self.btn_recalc.color = self.button_color
 
-
-
     def recalc_pulse_train(self):
         """
         Recalculate the pulse train based on the current EMG signal and update the IPTS.
+        Code adapted from open-source MUEdit in MATLAB
 
         This method performs the following tasks:
         1. Initializes an EMG object and prepares it by converting and formatting the EMG data.
@@ -839,97 +840,66 @@ class EditMU:
         Returns:
             np.ndarray: Array of detected spikes based on the recalculated pulse train.
         """
-        # Initialize EMG object and prepare the data
+        # Initialize RecalcFilter object containing 
         emg_obj = RecalcFilter(self.emgfile, self.grid_name)
-        print(f'shape raw signal {self.emgfile["RAW_SIGNAL"].shape}')
 
-        if self.emg is None:
+        if self.emg is None: # Only run if not ran before, takes lot of computing time
+            # Get emg data and filter
             self.emg = emg_obj.signal_dict["data"]
+            self.emg = bandpass_filter(self.emg, emg_obj.signal_dict['fsamp'],emg_type = 0)
 
-            self.emg = bandpass_filter(self.emg, emg_obj.signal_dict['fsamp'],emg_type = 0)  
-            print(f'emg first 10 = {self.emg[0,:10]}')
-            print(f'emg last 10 = {self.emg[0,-10:]}')
-
-
+            # Determine extension factor
             extension_factor =  round(np.round(emg_obj.ext_factor / len(self.emg)))
-        
-            emg_obj.signal_dict['extend_obvs_old'] = np.zeros([
+
+            # Extend EMG signal
+            emg_obj.signal_dict['extend_obvs_old'] = np.zeros([# Set template
                 1, np.shape(self.emg)[0] * extension_factor, np.shape(self.emg)[1] + extension_factor - 1 - emg_obj.differential_mode
             ])
-            print(f"shape before {np.shape(emg_obj.signal_dict['extend_obvs_old'])}")
-            self.eSIG = extend_emg(emg_obj.signal_dict['extend_obvs_old'][0], self.emg, extension_factor)
-            print(f'eSIG last 5x5: {self.eSIG[-6:,-6:]}')
+            self.eSIG = extend_emg(emg_obj.signal_dict['extend_obvs_old'][0], self.emg, extension_factor) # Actual extension of signal
             ReSIG = np.matmul(self.eSIG, self.eSIG.T) / len(self.eSIG)
             self.iReSIGt = np.linalg.pinv(ReSIG)
+
+            # Perform PCA on extended signal
             E, D = pcaesig(self.eSIG)
-            #print(f'Shape D = {np.shape(D)}\n D = {D[0,:6]}')
-            ##################### wsig, esig, E, D, dewhitening correct
 
-            
-            
-            self.wSIG, _, self.dewhiteningMatrix = whiteesig(self.eSIG, E, D)
-            print(f"First 5x5 dewhite {self.dewhiteningMatrix[:5,:5]}")
-            print(f'wsig first 5x5: {self.wSIG[:5, :5]}')
-            print(f'wsig last 5x5: {self.wSIG[-6:, -6:]}')
-
-            print(f'ipts indices 25223-25225: {self.ipts[self.current_index][25223:25226]}')
-
+            # Whiten extended signal and get dewhitening matrix
+            self.wSIG, _, self.dewhiteningMatrix = whiteesig(self.eSIG, E, D)      
         
-        # Prepare EMG signal and calculate pulse train according to MUedit
-        spikes = np.zeros(len(self.emgfile["MUPULSES"][self.current_index]))
+        # Get current spikes, needs to be int type
         spikes = np.array([int(val - 1) for val in self.emgfile["MUPULSES"][self.current_index]], dtype=int)
-        print(f'First 10 spikes {spikes[:10]}')
         
+        # Get whitened signal for the selected spikes
         wSIG_selected = self.wSIG[:, spikes]
-        print(f"Shape wsig selected {np.shape(wSIG_selected)}")
-        print(f'wsig selected: {wSIG_selected[:5,:5]}')
 
+        # Calculate MUFilters
         MUFilters = np.sum(wSIG_selected, axis=1)
-        print(f"shape MUFilters {np.shape(MUFilters)}")
-        print(f"First 10 MUFilters {MUFilters[:10]}")
-        #print(MUFilters)
 
+        # Calculate Pulse train
         Pt = ((self.dewhiteningMatrix @ MUFilters).T @ self.iReSIGt) @ self.eSIG
         Pt = Pt[:len(self.emg[0])]  # Adjust the length to match the original EMG signal
 
         # Post-process the pulse train
-        Pt[:round(0.1 * emg_obj.sample_rate)] = 0
-        Pt[-round(0.1 * emg_obj.sample_rate):] = 0
+        Pt[:round(0.1 * self.fsamp)] = 0
+        Pt[-round(0.1 * self.fsamp):] = 0
         Pt = Pt * np.abs(Pt)
 
         # Detect peaks from new pulse train
-        min_peak_distance = round(emg_obj.sample_rate * 0.005)
+        min_peak_distance = round(self.fsamp * 0.005)
         spikes = detect_peaks(Pt, mpd=min_peak_distance)
 
         # Scale according to 10 biggest peaks
         Pt /= np.mean(maxk(Pt, 10))
 
-        #print(Pt(spikes) - self.emgfile["IPTS"][self.current_index](spikes))
-        #Pt = np.pad(Pt, (0, 2))
-
-        print(f'Shape Pt as pd df{Pt.shape}')
-
         # Save new pulse train
         self.emgfile["IPTS"].iloc[:, self.current_index] = Pt
-        print(f'Shape of self.ipts {self.ipts[self.current_index].shape}')
-        print(f'10 of self.ipts {self.ipts[self.current_index].iloc[10000:10010]}')
-
-        print(f'10 of Pt {Pt[10000:10010]}')
-
-        print(self.emgfile["IPTS"])
-
-
-        print(np.allclose(self.emgfile["IPTS"][self.current_index], self.ipts[self.current_index]))
-
         self.ipts[self.current_index] = self.emgfile["IPTS"][self.current_index]
 
         return spikes
 
-
-
     def recalc_peaks(self, spikes):
         """
         Recalculate peaks by applying k-means clustering and removing outliers.
+        Adapted from MUEdit in MATLAB
 
         This method performs the following tasks:
         1. Retrieves the pulse train and IPTS data for the current motor unit.
@@ -954,11 +924,7 @@ class EditMU:
         spikes_ind = np.argmax(kmeans.cluster_centers_)
         spikes2 = spikes[np.where(kmeans.labels_ == spikes_ind)]
 
-        print(f'First 10 spikes {spikes2[:10]}')
-
-        #print(Pt(spikes2) - self.emgfile["IPTS"][self.current_index](spikes2))
-        
-        # Optionally remove outliers
+        # Optionally remove outliers, removes wrong things a lot of time so turned off for now
         """
         mean_val = np.mean(Pt[spikes2])
         std_val = np.std(Pt[spikes2])
@@ -968,8 +934,6 @@ class EditMU:
         
         # Update the MUPULSES with the filtered spikes
         self.emgfile["MUPULSES"][self.current_index] = spikes2
-
-
         
     def add_instructions(self):
         """
