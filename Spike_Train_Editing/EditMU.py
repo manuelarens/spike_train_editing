@@ -1,11 +1,3 @@
-"""
-EditMU Class
-
-This class provides a graphical user interface for editing and analyzing motor unit spike trains
-in HD-EMG data. It allows for interactive modification, visualization, and recalculation of EMG
-data using various tools and filters.
-"""
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -24,6 +16,29 @@ from RecalcFilter import RecalcFilter
 from processing_tools import get_binary_pulse_trains, whiteesig, extend_emg, pcaesig, detect_peaks, maxk, bandpass_filter
 
 class EditMU:
+    """
+    A class for visualizing and editing EMG motor unit spike data interactively.
+
+    The EditMU class is designed to load, process, and plot EMG data, allowing users to interact
+    with the plot by adding or removing spikes and recalculating SIL values.
+
+    Key Features:
+    1. Loads EMG data from a dictionary and processes IPTS and MUPULSES fields.
+    2. Visualizes motor unit spikes, with the option to use seconds or samples on the x-axis.
+    3. Allows interactive zooming, scrolling, and motor unit navigation via mouse and keyboard events.
+    4. Supports spike editing through rectangle selectors.
+    5. Displays a reference signal if specified.
+
+    Parameters:
+    - emgfile (dict): EMG data containing IPTS, MUPULSES, FSAMP, etc.
+    - filepath (str): Path to the EMG .json file for saving/loading.
+    - addrefsig (bool): Whether to include a reference signal on the plot.
+    - timeinseconds (bool): Whether to plot the x-axis in seconds (True) or samples (False).
+    - figsize (tuple): Size of the figure (in cm) for the plot.
+    - showimmediately (bool): Whether to immediately show the plot upon creation.
+    - tight_layout (bool): Whether to use a tight layout for the plot.
+    """
+
     def __init__(
         self,
         emgfile,
@@ -34,38 +49,7 @@ class EditMU:
         showimmediately=True,
         tight_layout=False,
     ):
-        """
-        Initialize the EditMU class and set up the plotting environment.
-
-        This constructor performs the following tasks:
-        1. Sets up instance variables using the provided parameters, including the EMG data file,
-        whether to add a reference signal, time unit preference, figure size, and layout settings.
-        2. Validates and processes the EMG data from the provided file, specifically the IPTS and MUPULSES data.
-        3. Initializes the x-axis based on whether the time is measured in seconds or samples.
-        4. Sets the initial motor unit index to 0.
-        5. Prepares lists and arrays for tracking plot states, including flags for the first plot,
-        recalculated SIL values, and arrays for storing SIL values and colors.
-        6. Creates a matplotlib figure and axis for plotting, with specified figure size.
-        7. Sets up RectangleSelector objects for adding and removing spikes on the plot.
-        8. Initializes boolean flags for managing spike addition and removal.
-        9. Plots the initial motor unit data.
-        10. Connects event handlers for zooming, scrolling, and key press events.
-        11. Adds navigation buttons for moving between motor units.
-        12. Optionally plots a reference signal if specified.
-        13. Configures the plot layout and displays the plot if required.
-
-        Parameters:
-        - emgfile (dict): A dictionary containing EMG data including 'IPTS', 'MUPULSES', and 'FSAMP'.
-        - addrefsig (bool): Flag to indicate whether to add a reference signal to the plot.
-        - timeinseconds (bool): Flag to specify whether the x-axis should be in seconds or samples.
-        - figsize (list): A list specifying the figure size in inches.
-        - showimmediately (bool): Flag to indicate whether to display the plot immediately.
-        - tight_layout (bool): Flag to indicate whether to use tight layout for the plot.
-
-        The constructor ensures that the plotting environment is properly initialized and ready
-        for displaying and interacting with motor unit data.
-        """
-        # Initialize attributes
+        # Initialize instance attributes
         self.filepath = filepath
         self.emgfile = emgfile
         self.addrefsig = addrefsig
@@ -74,62 +58,42 @@ class EditMU:
         self.tight_layout = tight_layout
         self.fsamp = emgfile["FSAMP"]
 
-        # Check for IPTS and MUPULSES
+        # Validate IPTS and generate x-axis based on time/samples
         self.ipts = self._validate_data(emgfile["IPTS"], pd.DataFrame, "IPTS")
-
-        # Generate x-axis (seconds or samples)
         self.x_axis = (
-            self.ipts.index / self.fsamp
-            if timeinseconds
-            else self.ipts.index
+            self.ipts.index / self.fsamp if timeinseconds else self.ipts.index
         )
 
-        # Initialize the current MU index
+        # Set initial motor unit index and flags for SIL recalculation
         self.current_index = 0
-
-        self.addrefsig = 1
-
         self.edited_dict = {}
-
+        self.addrefsig = 1
         self.grid_name = ['4-8-L']
-
         self.emg = None
         self.iReSIGt = None
         self.dewhiteningMatrix = None
         self.eSIG = None
         self.wSIG = None
-
-        # Initialize additional attributes
         self.peak_artists = []
         self.sil_recalculated = [False] * len(emgfile['MUPULSES'])
-        self.sil_old = np.zeros(len(emgfile['MUPULSES']))
-        for i in range(len(self.emgfile["IPTS"].columns)):
-            self.sil_old[i] = compute_sil(
-            self.ipts[i],
-            self.emgfile["MUPULSES"][i]
-        )
 
+        # Calculate SIL values for each motor unit
+        self.sil_old = np.zeros(len(emgfile['MUPULSES']))
+        for i in range(len(emgfile["IPTS"].columns)):
+            self.sil_old[i] = compute_sil(self.ipts[i], emgfile["MUPULSES"][i])
         self.sil_new = np.copy(self.sil_old)
         self.sil_color = 'black'
 
-        # Create the figure and two subplots (ax1 and ax2 stacked vertically)
+        # Create the figure and axes for plotting
         self.fig, (self.ax1, self.ax2) = plt.subplots(
-            2, 1,  # Two rows, one column
-            figsize=(figsize[0] / 2.54, figsize[1] / 2.54),  # Convert cm to inches
-         
-            num="IPTS" # Figure title or window name
+            2, 1, figsize=(figsize[0] / 2.54, figsize[1] / 2.54), num="IPTS"
         )
+        self.fig.subplots_adjust(top=0.9, bottom=0.1, hspace=0.4)
 
-        self.fig.subplots_adjust(
-        top=0.9,  # Adjust the upper limit of the top plot (less far up)
-        bottom=0.1,  # Keep the bottom position
-        hspace=0.4  # Adjust the space between the plots
-)
-
-        # Set shared x-axis for the subplots
+        # Share the x-axis between the two subplots
         self.ax1.get_shared_x_axes().joined(self.ax1, self.ax2)
 
-        # Initialize the RectangleSelectors
+        # Initialize RectangleSelectors for spike editing
         self.rect_selector_add = RectangleSelector(
             self.ax2, self.onselect_add, useblit=True, button=[1]
         )
@@ -140,25 +104,26 @@ class EditMU:
         )
         self.rect_selector_remove.set_active(False)
 
-        # Initialize boolean flags
+        # Boolean flags for spike addition/removal
         self.remove_spikes_boolean = False
         self.add_spikes_boolean = False
 
         self.file_path_json = ''
 
-        # Plot the initial MU
+        # Plot the initial motor unit
         self.plot_current_mu()
 
-        # Add zoom, scroll, and key press events
+        # Connect event handlers for zoom, scroll, and key press events
         self.fig.canvas.mpl_connect("scroll_event", self.zoom)
         self.fig.canvas.mpl_connect("key_press_event", self.on_key)
 
-        # Add previous and next buttons
+        # Add buttons for navigating motor units
         self.add_buttons()
 
-        # Show layout
+        # Show the plot layout if requested
         showgoodlayout(self.tight_layout, despined="2yaxes" if addrefsig else False)
 
+        # Maximize the plot window
         manager = plt.get_current_fig_manager()
         manager.window.showMaximized()
 
@@ -166,17 +131,29 @@ class EditMU:
         if showimmediately:
             plt.show()
 
-
     def _validate_data(self, data, expected_type, name):
+        """
+        Validate that the input data is of the expected type.
+        
+        Raises:
+        - TypeError: If the data is not the expected type.
+        """
         if isinstance(data, expected_type):
             return data
         raise TypeError(f"{name} is probably absent or not in the expected format")
 
+
     def _process_mu_pulses(self, mupulses):
-        # Check if it is correct data type and convert to seconds for easy plotting against time axis
+        """
+        Process motor unit pulses, converting them to seconds.
+
+        Raises:
+        - TypeError: If MUPULSES is not a list.
+        """
         if isinstance(mupulses, list):
             return [[pulse / self.fsamp for pulse in pulses] for pulses in mupulses]
         raise TypeError("MUPULSES is probably absent or not in a list")
+
 
 
     def plot_current_mu(self):

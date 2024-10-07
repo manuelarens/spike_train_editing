@@ -27,41 +27,46 @@ from EMG_Decomposition import EMGDecomposition
 from EditMU import EditMU
 from TMSiFileFormats.file_readers import Poly5Reader
 
-GRID_NAMES = ['4-8-L'] # If ngrids > 1, fill in ['name_grid1', 'name_grid2', etc...]
+# Define the mode: 'decompose' or 'edit'
+MODE = 'edit'  # Choose either 'decompose' for .poly5 files or 'edit' for pre-decomposed .json files
 
+GRID_NAMES = ['4-8-L']  # If ngrids > 1, fill in ['name_grid1', 'name_grid2', etc...]
 
 def main():
     """
     Main function to handle the EMG data processing workflow.
-    It starts with file selection, data display, offline decomposition, and finally
-    editing and saving motor unit data.
+    Depending on the mode, either decomposes a .poly5 file or edits a .json file.
     """
 
-    
-    # Open file dialog to select the EMG data file
-    """
-    filepath = filedialog.askopenfilename(
-        title='Select data file',
-        filetypes=(('Data files (.poly5)', '*.poly5'), ('All files', '*.*')),
-        initialdir=MEASUREMENTS_DIR
-    )
-    #"""
+    if MODE == 'decompose':
+        # Open file dialog to select the .poly5 data file for decomposition
+        filepath = filedialog.askopenfilename(
+            title='Select data file',
+            filetypes=(('Data files (.poly5)', '*.poly5'), ('All files', '*.*')),
+            initialdir=MEASUREMENTS_DIR
+        )
 
-    """
-    # If no file is selected, exit the script
-    if filepath == '':
-        print("No file selected. Exiting the script.")
-        sys.exit()
+        # If no file is selected, exit the script
+        if not filepath:
+            print("No file selected. Exiting the script.")
+            sys.exit()
 
-    # Display the raw EMG file using MNE
-    rejected_chan = display_raw_emg(filepath)
-    filepath_decomp = run_offline_decomposition(filepath, rejected_chan)
-    #"""
+        # Display the raw EMG file using MNE
+        # Explanation: Users are prompted to reject noisy/unconnected channels before decomposition.
+        # Only the selected channels will be used for motor unit decomposition. Do this by clicking on channel name to toggle on/off
+        rejected_chan = display_raw_emg(filepath)
 
+        # Run offline decomposition
+        filepath_decomp = run_offline_decomposition(filepath, rejected_chan)
 
-    filepath_decomp = 'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\training_measurement-20240611_085328_decomp.json' #own decomp
-    #filepath_decomp = r'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\training_20240611_085441_decomp.json' #tmsi decomp
-    #filepath_decomp = r'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\Pre_25_b.json' #openhdemg decomp
+    elif MODE == 'edit':
+        # Define the path to the pre-decomposed .json file
+        filepath_decomp = 'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\training_measurement-20240611_085328_decomp.json'
+        #filepath_decomp = 'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\training_20240611_085441_decomp.json' #tmsi decomp
+        #filepath_decomp = 'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\Pre_25_b.json' #openhdemg decomp
+
+    else:
+        raise ValueError("Invalid MODE. Choose 'decompose' or 'edit'.")
 
     # Load decomposed motor units and enable editing
     edit_decomposed_mu(filepath_decomp)
@@ -72,21 +77,16 @@ def display_raw_emg(filepath):
     Function to read and display raw EMG data from the selected file.
     Only connected channels are displayed to avoid unnecessary noise.
     """
+
     # Read the Poly5 data file
     data = Poly5Reader(filepath)
     mne_object = data.read_data_MNE(add_ch_locs=True)  # Load data into MNE object
-
-    # Get channel names and raw data samples
-    ch_names = mne_object.info['ch_names']
-    samples_mne = mne_object._data
 
     # Filter out unconnected channels (those with all-zero signals)
     show_chs = []
     for idx, ch in enumerate(mne_object._data):
         if ch.any():
             show_chs = np.hstack((show_chs, mne_object.info['ch_names'][idx]))
-
-    print(f'Length show_chs: {len(show_chs)}')
 
     # Pick only the channels to display
     data_object = mne_object.pick(show_chs)
@@ -129,7 +129,7 @@ def edit_decomposed_mu(filepath_decomp):
     emgfile = emg.sort_mus(emgfile)  # Sort motor units by discharge time
 
     # Plot the motor unit pulses
-    emg.plot_mupulses(emgfile)
+    #emg.plot_mupulses(emgfile)
 
     # Open the editor to manually adjust peaks
     mu_editor = EditMU(emgfile, filepath_decomp)
@@ -141,7 +141,6 @@ def edit_decomposed_mu(filepath_decomp):
     emgfile_edited = emg_from_json(filepath_decomp_edited)
     emgfile_edited = emg.sort_mus(emgfile_edited)
     emg.plot_mupulses(emgfile_edited)
-
 
 if __name__ == "__main__":
     main()
