@@ -27,7 +27,7 @@ from EMG_Decomposition import EMGDecomposition
 from EditMU import EditMU
 from TMSiFileFormats.file_readers import Poly5Reader
 
-GRID_TYPE = '4-8-L'
+GRID_NAMES = ['4-8-L'] # If ngrids > 1, fill in ['name_grid1', 'name_grid2', etc...]
 
 
 def main():
@@ -86,6 +86,8 @@ def display_raw_emg(filepath):
         if ch.any():
             show_chs = np.hstack((show_chs, mne_object.info['ch_names'][idx]))
 
+    print(f'Length show_chs: {len(show_chs)}')
+
     # Pick only the channels to display
     data_object = mne_object.pick(show_chs)
 
@@ -94,7 +96,6 @@ def display_raw_emg(filepath):
         scalings=dict(eeg=250e-6),
         start=0, duration=5, n_channels=5,
         title=filepath, block=True
-
     )
     
     return data_object.info['bads']
@@ -109,7 +110,7 @@ def run_offline_decomposition(filepath, rejected_chan):
 
     # Create EMG decomposition object and run the decomposition process
     offline_decomp = EMGDecomposition(filepath=filepath, rejected_chan = rejected_chan)
-    offline_decomp.run(grid_name=GRID_TYPE)
+    offline_decomp.run(grid_names=GRID_NAMES)
 
     # Get the path to the saved decomposed JSON file
     filepath_decomp = offline_decomp.emg_obj.file_path_json

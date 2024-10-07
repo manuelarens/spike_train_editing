@@ -339,8 +339,6 @@ class EditMU:
             )
             self.peak_artists.append(peak_artist)
 
-
-
     def zoom(self, event):
         """
         Handle zooming in and out of the plot based on mouse scroll events.

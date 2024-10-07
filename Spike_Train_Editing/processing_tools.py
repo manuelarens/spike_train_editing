@@ -1,7 +1,6 @@
 import numpy as np
 import scipy
-import pandas as pd 
-from scipy import signal
+import pandas as pd
 from numpy import linalg
 from scipy.fft import fft
 import matplotlib.pyplot as plt
@@ -590,8 +589,8 @@ def batch_process_filters(MU_filters, wSIG, plateau_coord, exfactor,diff,ltime,f
 def xcorr(x,y): # https://stackoverflow.com/questions/25830840/python-cross-correlation
     norm_x = x/np.linalg.norm(x)
     norm_y = y/np.linalg.norm(y)
-    corr = signal.correlate(norm_x, norm_y, mode="full") #coefficient of correlation
-    lags = signal.correlation_lags(len(x), len(y), mode="full") #lags of correlation 
+    corr = scipy.signal.correlate(norm_x, norm_y, mode="full") #coefficient of correlation
+    lags = scipy.signal.correlation_lags(len(x), len(y), mode="full") #lags of correlation 
     return lags, corr
 
 def remove_duplicates(MU_filters, pulse_trains, discharge_times, discharge_times_aligned, maxlag, jitter, fsamp, dup_thr): #old remove_duplicates!

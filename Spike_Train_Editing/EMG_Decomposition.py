@@ -40,7 +40,7 @@ class EMGDecomposition:
         self.emg_obj = offline_EMG(0, rejected_chan=self.rejected_chan)  # 0/1 filter signal
         self.file = filepath
 
-    def run(self, grid_name='4-8-L'):
+    def run(self, grid_names=['4-8-L']):
         """
         Run the decomposition process for the EMG file.
 
@@ -52,7 +52,7 @@ class EMGDecomposition:
         """
         # File organization and selection
         self.emg_obj.select_file(self.file)  # Select the training file (.mat), composed by ISpin
-        self.emg_obj.convert_poly5_xdf(grid_names=[grid_name], muscle_names=['TA'])  # Adds signal_dict to the emg_obj, using Matlab output of ISpin
+        self.emg_obj.convert_poly5_xdf(grid_names=grid_names, muscle_names=['TA'])  # Adds signal_dict to the emg_obj, using Matlab output of ISpin
         print('Data loaded')
         self.emg_obj.grid_formatter()  # Adds spatial context
 
@@ -67,7 +67,6 @@ class EMGDecomposition:
         self.emg_obj.signal_dict['diff_data'] = []  # Placeholder for the differential data
         tracker = 0  # Tracker corresponds to the grid number
         nwins = int(len(self.emg_obj.plateau_coords) / 2)  # Number of force profiles to decompose
-        print(f'nwins = {nwins}')
 
         # Loop through grids
         for g in range(int(self.emg_obj.signal_dict['ngrids'])):
