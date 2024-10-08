@@ -19,7 +19,7 @@ This project handles EMG (Electromyography) data processing, including EMG signa
 - **RecalcFilter.py**: Contains the `RecalcFilter` class, used to recalculate the filter for the current motor unit based on user modifications to the spikes. This class is essential for adjusting motor unit detection based on filtered signal updates.
 - **processing_tools.py**: Contains helper functions such as file loading, signal processing, and saving routines.
 
-## Run script
+## Run program
 
 To run the script, execute the `main.py` file. Inside the script, you can select between two modes by changing the `MODE` variable:
 

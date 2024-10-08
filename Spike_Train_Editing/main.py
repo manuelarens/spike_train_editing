@@ -9,10 +9,10 @@ This script handles EMG data processing including:
 The script utilizes a custom `EditMU` class for Motor Unit editing.
 """
 
+from tkinter import filedialog
 import sys
 from os.path import join, dirname, realpath
 import numpy as np
-from tkinter import filedialog
 import openhdemg.library as emg
 
 # Define paths for modules and measurements directories
@@ -51,9 +51,9 @@ def main():
             print("No file selected. Exiting the script.")
             sys.exit()
 
-        # Display the raw EMG file using MNE
-        # Explanation: Users are prompted to reject noisy/unconnected channels before decomposition.
-        # Only the selected channels will be used for motor unit decomposition. Do this by clicking on channel name to toggle on/off
+        # Users are prompted to reject noisy/unconnected channels before decomposition.
+        # Only the selected channels will be used for motor unit decomposition.
+        # Click on channel name to toggle on/off
         rejected_chan = display_raw_emg(filepath)
 
         # Run offline decomposition
@@ -61,9 +61,13 @@ def main():
 
     elif MODE == 'edit':
         # Define the path to the pre-decomposed .json file
-        filepath_decomp = 'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\training_measurement-20240611_085328_decomp.json'
-        #filepath_decomp = 'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\training_20240611_085441_decomp.json' #tmsi decomp
-        #filepath_decomp = 'C:\\Manuel\\Uni\\Master\\Stage\\Code\\tmsi-python-interface-main\\tmsi-python-interface-main\\measurements\\Pre_25_b.json' #openhdemg decomp
+        filepath_decomp = join(
+            MEASUREMENTS_DIR,
+            'eigen meting tmsi decomp.json'
+        )
+
+        #filepath_decomp = join(MEASUREMENTS_DIR, 'training_20240611_085441_decomp.json' #tmsi decomp
+        #filepath_decomp = join(MEASUREMENTS_DIR, 'Pre_25_b.json' #openhdemg decomp
 
     else:
         raise ValueError("Invalid MODE. Choose 'decompose' or 'edit'.")
@@ -84,7 +88,7 @@ def display_raw_emg(filepath):
 
     # Filter out unconnected channels (those with all-zero signals)
     show_chs = []
-    for idx, ch in enumerate(mne_object._data):
+    for idx, ch in enumerate(mne_object.get_data()):
         if ch.any():
             show_chs = np.hstack((show_chs, mne_object.info['ch_names'][idx]))
 
@@ -96,8 +100,7 @@ def display_raw_emg(filepath):
         scalings=dict(eeg=250e-6),
         start=0, duration=5, n_channels=5,
         title=filepath, block=True
-    )
-    
+    )  
     return data_object.info['bads']
 
 

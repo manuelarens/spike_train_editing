@@ -462,7 +462,7 @@ class offline_EMG(EMG):
         grid = g+1
         if self.to_filter: # adding since will need to avoid this step if doing real-time decomposition + biofeedback, rond ergens af?
             #self.signal_dict['batched_data'][tracker] = notch_filter(self.signal_dict['batched_data'][tracker],self.signal_dict['fsamp'])
-            #self.signal_dict['batched_data'][tracker] = bandpass_filter(self.signal_dict['batched_data'][tracker],self.signal_dict['fsamp'],emg_type = self.emg_type)  
+            self.signal_dict['batched_data'][tracker] = bandpass_filter(self.signal_dict['batched_data'][tracker],self.signal_dict['fsamp'],emg_type = self.emg_type)  
             pass
 
         # differentiation - typical EMG generation model treats low amplitude spikes/MUs as noise, which is common across channels so can be cancelled with a first order difference. Useful for high intensities - where cross talk has biggest impact.

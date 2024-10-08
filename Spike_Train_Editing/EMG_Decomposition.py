@@ -37,7 +37,7 @@ class EMGDecomposition:
 
         self.rejected_chan = rejected_chan
         print('Initializing offline EMG...')
-        self.emg_obj = offline_EMG(0, rejected_chan=self.rejected_chan)  # 0/1 filter signal
+        self.emg_obj = offline_EMG(1, rejected_chan=self.rejected_chan)  # 0/1 filter signal
         self.file = filepath
 
     def run(self, grid_names=['4-8-L']):

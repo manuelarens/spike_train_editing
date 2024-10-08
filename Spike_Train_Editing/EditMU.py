@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import messagebox
 import json
 import os
+import copy
 import gzip
 from sklearn.cluster import KMeans
 
@@ -60,9 +61,12 @@ class EditMU:
 
         # Validate IPTS and generate x-axis based on time/samples
         self.ipts = self._validate_data(emgfile["IPTS"], pd.DataFrame, "IPTS")
+        self.ipts_original = self.ipts.copy()
         self.x_axis = (
             self.ipts.index / self.fsamp if timeinseconds else self.ipts.index
         )
+
+        self.mupulses_original = copy.deepcopy(emgfile['MUPULSES'])
 
         # Set initial motor unit index and flags for SIL recalculation
         self.current_index = 0
@@ -107,6 +111,7 @@ class EditMU:
         # Boolean flags for spike addition/removal
         self.remove_spikes_boolean = False
         self.add_spikes_boolean = False
+        self.reset_mu_boolean = False
 
         self.file_path_json = ''
 
@@ -213,7 +218,14 @@ class EditMU:
             self.ax1.set_ylim((0,2*max(discharge_rate)))
 
             # Handle SIL color and difference text logic
-            if not self.sil_recalculated[self.current_index]:
+            if self.reset_mu_boolean:
+                self.sil_new[self.current_index] = compute_sil(
+                    self.ipts[self.current_index],
+                    self.emgfile["MUPULSES"][self.current_index]
+                )
+                self.sil_color = 'black'
+                sil_dif_text = ""
+            elif not self.sil_recalculated[self.current_index]:
                 self.sil_color = 'black'
                 sil_dif_text = ""
             else:
@@ -431,6 +443,10 @@ class EditMU:
         self.hover_color = "lightgray"
         self.button_active_color = "mistyrose"
 
+        offset = 0.07
+        button_width = 0.15
+        spacing = 0.03
+
         # Create and position "Previous" button
         ax_prev = plt.axes([0.01, 0.025, 0.12, 0.04])
         self.btn_prev = Button(ax_prev, "Previous", color=self.button_color, hovercolor=self.hover_color)
@@ -442,28 +458,75 @@ class EditMU:
         self.btn_next.on_clicked(self.next_mu)  # Link button to method
 
         # Create and position "Add spikes" button
-        ax_add = plt.axes([0.08, 0.51, 0.19, 0.04])
+        ax_add = plt.axes([offset, 0.51, button_width, 0.04])
         self.btn_add = Button(ax_add, "Add spikes", color=self.button_color, hovercolor=self.hover_color)
         self.btn_add.on_clicked(self.add_spikes)  # Link button to method
 
         # Create and position "Remove spikes" button
-        ax_remove = plt.axes([0.3, 0.51, 0.19, 0.04])
+        ax_remove = plt.axes([offset + button_width + spacing, 0.51, button_width, 0.04])
         self.btn_remove = Button(ax_remove, "Remove spikes", color=self.button_color, hovercolor=self.hover_color)
         self.btn_remove.on_clicked(self.remove_spikes)  # Link button to method
 
         # Create and position "Recalc. filter" button
-        ax_recalc = plt.axes([0.52, 0.51, 0.19, 0.04])
+        ax_recalc = plt.axes([offset + 2*(button_width + spacing), 0.51, button_width, 0.04])
         self.btn_recalc = Button(ax_recalc, "Recalc. filter", color=self.button_color, hovercolor=self.hover_color)
         self.btn_recalc.on_clicked(self.recalc_filter)  # Link button to method
 
+        # Create and position "Recalc. filter" button
+        ax_reset = plt.axes([offset + 3*(button_width + spacing), 0.51, button_width, 0.04])
+        self.btn_reset = Button(ax_reset, "Reset MU", color=self.button_color, hovercolor=self.hover_color)
+        self.btn_reset.on_clicked(self.reset_mu)  # Link button to method
+
         # Create and position "Delete MU" button with distinct color
-        ax_delete = plt.axes([0.74, 0.51, 0.19, 0.04])
+        ax_delete = plt.axes([offset + 4*(button_width + spacing), 0.51, button_width, 0.04])
         self.btn_delete = Button(ax_delete, "Delete MU", color='tomato', hovercolor='salmon')
         self.btn_delete.on_clicked(self.delete_MU)  # Link button to method
 
         # Update the canvas to reflect the added buttons
         self.fig.canvas.draw_idle()
 
+    def reset_mu(self, event):
+        """
+        Reset the current motor unit (MU) to its original state after user confirmation.
+
+        This method resets the MU data by restoring the 'IPTS' and 'MUPULSES' entries to their original
+        states. It disables interactive buttons during the reset process, updates the plot, and re-enables
+        interactions afterward.
+
+        Args:
+            event: The event object associated with the button click that triggered this method.
+        """
+        # Create a hidden Tkinter root window to display a confirmation dialog
+        root = tk.Tk()
+        root.withdraw()  # Hide the root window
+
+        # Show a confirmation dialog to the user
+        confirm = messagebox.askyesno(
+            "Confirm Reset",
+            "Are you sure you want to reset this motor unit to its original state?",
+            icon='warning',  # Display warning icon
+            parent=root
+        )
+
+        if confirm:
+            # Disable all button interactions during the reset process
+            self.disconnect_buttons()
+
+            # Restore 'IPTS' and 'MUPULSES' to their original values for the current MU
+            self.emgfile["IPTS"][self.current_index] = self.ipts_original[self.current_index]
+            self.ipts[self.current_index] = self.ipts_original[self.current_index]
+            self.emgfile['MUPULSES'][self.current_index] = self.mupulses_original[self.current_index]
+
+            # Set the flag to indicate a reset is happening and update the plot
+            self.reset_mu_boolean = True
+            self.plot_current_mu()  # Redraw the current MU with restored data
+            self.fig.canvas.draw_idle()  # Update the canvas to reflect changes
+
+            # Reset the flag after plotting
+            self.reset_mu_boolean = False
+
+        # Close the confirmation dialog window
+        root.destroy()
 
     def delete_MU(self, event):
         """
@@ -508,9 +571,11 @@ class EditMU:
 
             # Remove the motor unit pulses at the current index
             del self.emgfile['MUPULSES'][self.current_index]
+            del self.mupulses_original[self.current_index]
 
             # Update internal state variables
             self.sil_recalculated.pop(self.current_index)
+            self.ipts_original.pop(self.current_index)
             self.sil_old = np.delete(self.sil_old, self.current_index)
             self.sil_new = np.delete(self.sil_new, self.current_index)
 
@@ -857,6 +922,7 @@ class EditMU:
         Pt[:round(0.1 * self.fsamp)] = 0
         Pt[-round(0.1 * self.fsamp):] = 0
         Pt = Pt * np.abs(Pt)
+        Pt = np.real(Pt)
 
         # Detect peaks from new pulse train
         min_peak_distance = round(self.fsamp * 0.005)
@@ -905,7 +971,7 @@ class EditMU:
         std_val = np.std(Pt[spikes2])
         self.threshold = mean_val + 3 * std_val
         spikes2 = spikes2[Pt[spikes2] <= self.threshold]
-        """
+        #"""
         
         # Update the MUPULSES with the filtered spikes
         self.emgfile["MUPULSES"][self.current_index] = spikes2
