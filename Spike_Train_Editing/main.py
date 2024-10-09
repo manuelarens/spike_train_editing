@@ -63,7 +63,7 @@ def main():
         # Define the path to the pre-decomposed .json file
         filepath_decomp = join(
             MEASUREMENTS_DIR,
-            'training_20240611_085441_decomp.json'
+            'training_20240627_043034_decomp.json'
         )
 
         #filepath_decomp = join(MEASUREMENTS_DIR, 'training_20240611_085441_decomp.json' #tmsi decomp

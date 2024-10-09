@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import messagebox
 import json
 import os
-import copy
+from copy import deepcopy
 import gzip
 from sklearn.cluster import KMeans
 
@@ -65,8 +65,7 @@ class EditMU:
         self.x_axis = (
             self.ipts.index / self.fsamp if timeinseconds else self.ipts.index
         )
-
-        self.mupulses_original = copy.deepcopy(emgfile['MUPULSES'])
+        self.mupulses_original = deepcopy(emgfile['MUPULSES'])
 
         # Set initial motor unit index and flags for SIL recalculation
         self.current_index = 0
@@ -119,7 +118,7 @@ class EditMU:
         self.plot_current_mu()
 
         # Connect event handlers for zoom, scroll, and key press events
-        self.fig.canvas.mpl_connect("scroll_event", self.zoom)
+        self.fig.canvas.mpl_connect("scroll_event", self.on_scroll)
         self.fig.canvas.mpl_connect("key_press_event", self.on_key)
 
         # Add buttons for navigating motor units
@@ -338,53 +337,66 @@ class EditMU:
             )
             self.peak_artists.append(peak_artist)
 
-    def zoom(self, event):
+    def zoom(self, direction):
         """
         Handle zooming in and out of the plot based on mouse scroll events.
 
-        This method allows zooming beyond boundaries but adjusts them intuitively:
+        This method allows intuitive zooming behavior:
         1. Retrieves current x-axis limits of the plot.
-        2. Determines zoom factor based on mouse scroll direction:
-            - Zoom in for scroll "up".
-            - Zoom out for scroll "down".
-        3. Calculates new x-axis limits, respecting boundaries:
-            - If zooming out exceeds the plot boundaries, it adjusts accordingly while still zooming the opposite side.
+        2. Determines zoom factor based on scroll direction:
+            - Zoom in if the direction is "up".
+            - Zoom out if the direction is "down".
+        3. Calculates new x-axis limits, adjusting boundaries:
+            - If zooming out exceeds the plot limits, adjust only the non-boundary side.
         4. Updates x-axis limits and redraws the canvas.
 
         Parameters:
-        - event (matplotlib.backend_bases.ScrollEvent): Mouse scroll event.
+        - direction (str): Zoom direction, either "up" for zoom in or "down" for zoom out.
         """
         current_xlim = self.ax1.get_xlim()  # Get current x-axis limits
-        zoom_factor = 0.85 if event.button == "up" else 1.15  # Determine zoom factor
+        zoom_factor = 0.85 if direction == "up" else 1.15  # Determine zoom factor
 
-        # Calculate midpoint and delta for the new x-axis limits
+        # Calculate midpoint and delta for new x-axis limits
         midpoint = (current_xlim[0] + current_xlim[1]) / 2
         delta = (current_xlim[1] - current_xlim[0]) * zoom_factor / 2
         new_xlim = (midpoint - delta, midpoint + delta)
 
-        # Handle left boundary: ensure it doesn't go below 0, and adjust the right side proportionally
+        # Adjust for left boundary: don't go below 0, extend right as needed
         if new_xlim[0] < 0:
-            new_xlim = (0, min(midpoint + delta * 2, max(self.x_axis)))  # Set left to 0, but respect the maximum x-axis value for the right
-        
-        # Handle right boundary: ensure it doesn't go beyond max(self.x_axis)
+            new_xlim = (0, min(midpoint + delta * 2, max(self.x_axis)))  # Adjust right if left hits 0
+
+        # Adjust for right boundary: don't exceed max(self.x_axis)
         if new_xlim[1] > max(self.x_axis):
-            new_xlim = (max(self.x_axis) - 2 * delta, max(self.x_axis))  # Shrink left, fix right at max
-        
-        # Ensure final x-axis limits are within valid range and make sure it zooms smoothly
+            new_xlim = (max(self.x_axis) - 2 * delta, max(self.x_axis))  # Shrink left if right hits max
+
+        # Apply new x-axis limits
         if new_xlim[0] >= 0:
             self.ax1.set_xlim(new_xlim)
             self.ax2.set_xlim(new_xlim)
             self.fig.canvas.draw_idle()  # Redraw the canvas to apply changes
 
+    def on_scroll(self, event):
+        """
+        Handle mouse scroll events to zoom in or out of the plot.
 
+        This method determines the scroll direction and calls the zoom function.
+
+        Parameters:
+        - event (matplotlib.backend_bases.ScrollEvent): The scroll event containing information about the scroll direction.
+        """
+        if event.button == 'up':
+            self.zoom('up')
+        elif event.button == 'down':
+            self.zoom('down')
 
     def on_key(self, event):
         """
-        Handle key press events to navigate through motor units.
+        Handle key press events for plot navigation and zooming.
 
-        This method performs the following actions based on the pressed key:
-        1. Scrolls left through the motor units if the 'left' arrow key or 'a' key is pressed.
-        2. Scrolls right through the motor units if the 'right' arrow key or 'd' key is pressed.
+        This method allows for:
+        1. Scrolling left ('left arrow' or 'a').
+        2. Scrolling right ('right arrow' or 'd').
+        3. Zooming in and out ('up' and 'down' arrow keys).
 
         Parameters:
         - event (matplotlib.backend_bases.KeyEvent): The key event containing information about the pressed key.
@@ -393,7 +405,10 @@ class EditMU:
             self.scroll_left()  # Scroll left through motor units
         elif event.key in ("right", "d"):
             self.scroll_right()  # Scroll right through motor units
-
+        elif event.key in ("up", "w"):
+            self.zoom('up')  # Zoom in
+        elif event.key in ("down"):
+            self.zoom('down')  # Zoom out
 
     def scroll_left(self):
         """
@@ -436,8 +451,6 @@ class EditMU:
         self.ax1.set_xlim(new_xlim)
         self.ax2.set_xlim(new_xlim)
         self.fig.canvas.draw_idle()  # Redraw the canvas
-
-
 
     def add_buttons(self):
         """
@@ -758,23 +771,29 @@ class EditMU:
             xmax = xmasked[np.argmax(ymasked)]
             ymax = ymasked.max()
 
-            # Plot the peak and add it to the list of peak artists
-            peak_artist, = self.ax2.plot(xmax, ymax, "ro", markersize=2, label="Peak")
-            self.peak_artists.append(peak_artist)  # Store the artist object
-
-            # Add the new peak to the motor unit pulses
+            # Convert the peak time to a sample index
             x_idx = xmax * self.fsamp
-            index = np.searchsorted(self.emgfile["MUPULSES"][self.current_index], x_idx)
-            self.emgfile["MUPULSES"][self.current_index] = np.insert(
-                self.emgfile["MUPULSES"][self.current_index], index, x_idx
-            )
+
+            # Check if the peak is already in the array (using a small tolerance)
+            tolerance = 1  # Adjust tolerance based on your sampling resolution
+            pulses = self.emgfile["MUPULSES"][self.current_index]
+
+            if np.any(np.abs(pulses - x_idx) <= tolerance):
+                print("Peak is already in the array, skipping addition")
+            else:
+                # Plot the peak and add it to the list of peak artists
+                peak_artist, = self.ax2.plot(xmax, ymax, "ro", markersize=2, label="Peak")
+                self.peak_artists.append(peak_artist)  # Store the artist object
+
+                # Add the new peak to the motor unit pulses
+                index = np.searchsorted(pulses, x_idx)
+                self.emgfile["MUPULSES"][self.current_index] = np.insert(pulses, index, x_idx)
 
         # Refresh the canvas to reflect changes
         self.plot_discharge_rate()
         current_xlim = self.ax2.get_xlim()
         self.ax1.set_xlim(current_xlim)
         self.fig.canvas.draw_idle()
-
 
     def onselect_remove(self, eclick, erelease):
         """
@@ -819,8 +838,10 @@ class EditMU:
                 x_idx = int(xmax * self.fsamp)  # Convert xmax to sample index
                 pulses = self.emgfile["MUPULSES"][self.current_index]
                 index = np.searchsorted(pulses, x_idx)
-                if index < len(pulses) and pulses[index] == x_idx:
+                tolerance = 1  # off-by-one errors can occur, this fixes it
+                if index < len(pulses) and abs(pulses[index] - x_idx) <= tolerance:
                     self.emgfile["MUPULSES"][self.current_index] = np.delete(pulses, index)
+                    print(f'pulses[index] = {pulses[index]}')
 
                     # Increment the deletion counter
                     delete_count += 1
@@ -942,7 +963,7 @@ class EditMU:
         Pt = np.real(Pt)
 
         # Detect peaks from new pulse train
-        min_peak_distance = round(self.fsamp * 0.005)
+        min_peak_distance = round(self.fsamp * 0.01)
         spikes = detect_peaks(Pt, mpd=min_peak_distance)
 
         # Scale according to 10 biggest peaks
