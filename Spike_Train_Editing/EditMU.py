@@ -31,7 +31,7 @@ class EditMU:
     5. Displays a reference signal if specified.
 
     Parameters:
-    - emgfile (dict): EMG data containing IPTS, MUPULSES, FSAMP, etc.
+    - emgfile (dict): EMG data in OpenHDEMG .json format containing IPTS, MUPULSES, FSAMP, etc.
     - filepath (str): Path to the EMG .json file for saving/loading.
     - addrefsig (bool): Whether to include a reference signal on the plot.
     - timeinseconds (bool): Whether to plot the x-axis in seconds (True) or samples (False).
@@ -201,6 +201,16 @@ class EditMU:
     def plot_discharge_rate(self):
         """
         Plot the instantaneous discharge rate on the top subplot.
+        The method performs the following steps:
+            1. Clears the previous plot on the top subplot.
+            2. Retrieves the pulse timings for the current MU.
+            3. If there are enough pulses, calculates discharge intervals, rates, 
+            and time values for plotting.
+            4. Plots the discharge rate as a scatter plot.
+            5. Updates the SIL values and determines the appropriate color based on 
+            changes in SIL.
+            6. Displays the current SIL value on the plot.
+            7. If not enough pulses exist, displays a message indicating this.
         """
         self.ax1.clear()  # Clear previous plot on the top subplot
         mu_pulses = self.emgfile['MUPULSES'][self.current_index] # Get pulses of current MU
@@ -332,31 +342,40 @@ class EditMU:
         """
         Handle zooming in and out of the plot based on mouse scroll events.
 
-        This method performs the following actions:
-        1. Retrieves the current x-axis limits of the plot.
-        2. Determines the zoom factor based on the mouse scroll direction:
-        - Zoom in if the scroll direction is "up".
-        - Zoom out if the scroll direction is "down".
-        3. Calculates the new x-axis limits based on the zoom factor and the midpoint of the current x-axis limits.
-        4. Ensures the new x-axis limits do not go below 0 or exceed the maximum x-axis value.
-        5. Updates the x-axis limits of the plot and redraws the canvas to reflect the zoom change.
+        This method allows zooming beyond boundaries but adjusts them intuitively:
+        1. Retrieves current x-axis limits of the plot.
+        2. Determines zoom factor based on mouse scroll direction:
+            - Zoom in for scroll "up".
+            - Zoom out for scroll "down".
+        3. Calculates new x-axis limits, respecting boundaries:
+            - If zooming out exceeds the plot boundaries, it adjusts accordingly while still zooming the opposite side.
+        4. Updates x-axis limits and redraws the canvas.
 
         Parameters:
-        - event (matplotlib.backend_bases.ScrollEvent): The mouse scroll event containing information about the scroll direction.
+        - event (matplotlib.backend_bases.ScrollEvent): Mouse scroll event.
         """
         current_xlim = self.ax1.get_xlim()  # Get current x-axis limits
-        zoom_factor = 0.85 if event.button == "up" else 1.15  # Determine zoom factor based on scroll direction
+        zoom_factor = 0.85 if event.button == "up" else 1.15  # Determine zoom factor
 
-        # Calculate the midpoint and delta for the new x-axis limits
+        # Calculate midpoint and delta for the new x-axis limits
         midpoint = (current_xlim[0] + current_xlim[1]) / 2
         delta = (current_xlim[1] - current_xlim[0]) * zoom_factor / 2
         new_xlim = (midpoint - delta, midpoint + delta)
 
-        # Ensure new x-axis limits are within valid range
-        if min(new_xlim) > 0 and max(new_xlim) < max(self.x_axis):
-            self.ax1.set_xlim(new_xlim)  # Update x-axis limits
+        # Handle left boundary: ensure it doesn't go below 0, and adjust the right side proportionally
+        if new_xlim[0] < 0:
+            new_xlim = (0, min(midpoint + delta * 2, max(self.x_axis)))  # Set left to 0, but respect the maximum x-axis value for the right
+        
+        # Handle right boundary: ensure it doesn't go beyond max(self.x_axis)
+        if new_xlim[1] > max(self.x_axis):
+            new_xlim = (max(self.x_axis) - 2 * delta, max(self.x_axis))  # Shrink left, fix right at max
+        
+        # Ensure final x-axis limits are within valid range and make sure it zooms smoothly
+        if new_xlim[0] >= 0:
+            self.ax1.set_xlim(new_xlim)
             self.ax2.set_xlim(new_xlim)
             self.fig.canvas.draw_idle()  # Redraw the canvas to apply changes
+
 
 
     def on_key(self, event):
@@ -380,47 +399,44 @@ class EditMU:
         """
         Scroll the plot view to the left by a fixed percentage of the current x-axis range.
 
-        This method performs the following actions:
-        1. Retrieves the current x-axis limits of the plot.
-        2. Calculates the delta for scrolling, which is 10% of the current x-axis range.
-        3. Updates the x-axis limits to scroll left, ensuring the new limits do not go below 0.
-        4. Redraws the canvas to reflect the changes.
-
-        This method ensures that the plot view is shifted left while staying within valid bounds.
-
+        This method ensures the plot view shifts left while staying within valid bounds.
+        If scrolling would exceed the left boundary (0), it adjusts to start from 0.
         """
         current_xlim = self.ax1.get_xlim()  # Get current x-axis limits
         delta = (current_xlim[1] - current_xlim[0]) * 0.1  # Calculate the scrolling delta
 
-        # Check if new x-axis limits will be within valid range
+        # Calculate new x-axis limits, ensuring left limit doesn't go below 0
         if current_xlim[0] - delta > 0:
-            new_xlim = [current_xlim[0] - delta, current_xlim[1] - delta]  # Calculate new x-axis limits
-            self.ax1.set_xlim(new_xlim)  # Update x-axis limits
-            self.ax2.set_xlim(new_xlim)
-            self.fig.canvas.draw_idle()  # Redraw the canvas to apply changes
+            new_xlim = [current_xlim[0] - delta, current_xlim[1] - delta]  # Scroll left normally
+        else:
+            new_xlim = [0, current_xlim[1] - current_xlim[0]]  # Set left limit to 0 and right proportionally
+
+        # Apply new limits and redraw
+        self.ax1.set_xlim(new_xlim)
+        self.ax2.set_xlim(new_xlim)
+        self.fig.canvas.draw_idle()  # Redraw the canvas
 
     def scroll_right(self):
         """
         Scroll the plot view to the right by a fixed percentage of the current x-axis range.
 
-        This method performs the following actions:
-        1. Retrieves the current x-axis limits of the plot.
-        2. Calculates the delta for scrolling, which is 10% of the current x-axis range.
-        3. Updates the x-axis limits to scroll right, ensuring the new limits do not exceed the maximum x-axis value.
-        4. Redraws the canvas to reflect the changes.
-
-        This method ensures that the plot view is shifted right while staying within valid bounds.
-
+        This method ensures the plot view shifts right while staying within valid bounds.
+        If scrolling would exceed the right boundary (max(self.x_axis)), it adjusts to end at max(self.x_axis).
         """
         current_xlim = self.ax1.get_xlim()  # Get current x-axis limits
         delta = (current_xlim[1] - current_xlim[0]) * 0.1  # Calculate the scrolling delta
 
-        # Check if new x-axis limits will be within valid range
+        # Calculate new x-axis limits, ensuring right limit doesn't exceed max(self.x_axis)
         if current_xlim[1] + delta < max(self.x_axis):
-            new_xlim = [current_xlim[0] + delta, current_xlim[1] + delta]  # Calculate new x-axis limits
-            self.ax1.set_xlim(new_xlim)  # Update x-axis limits
-            self.ax2.set_xlim(new_xlim)
-            self.fig.canvas.draw_idle()  # Redraw the canvas to apply changes
+            new_xlim = [current_xlim[0] + delta, current_xlim[1] + delta]  # Scroll right normally
+        else:
+            new_xlim = [max(self.x_axis) - (current_xlim[1] - current_xlim[0]), max(self.x_axis)]  # Set right limit to max
+
+        # Apply new limits and redraw
+        self.ax1.set_xlim(new_xlim)
+        self.ax2.set_xlim(new_xlim)
+        self.fig.canvas.draw_idle()  # Redraw the canvas
+
 
 
     def add_buttons(self):
@@ -433,7 +449,8 @@ class EditMU:
         3. Add spikes to the plot ("Add spikes" button).
         4. Remove spikes from the plot ("Remove spikes" button).
         5. Recalculate the filter ("Recalc. filter" button).
-        6. Delete the current motor unit ("Delete MU" button).
+        6. Reset the current MU to the original ("Reset MU" button).
+        7. Delete the current motor unit ("Delete MU" button).
 
         The buttons are created with specific colors and are linked to their respective callback methods.
         The canvas is updated to reflect the addition of the buttons.
@@ -443,7 +460,7 @@ class EditMU:
         self.hover_color = "lightgray"
         self.button_active_color = "mistyrose"
 
-        offset = 0.07
+        offset = 0.06
         button_width = 0.15
         spacing = 0.03
 
@@ -472,9 +489,9 @@ class EditMU:
         self.btn_recalc = Button(ax_recalc, "Recalc. filter", color=self.button_color, hovercolor=self.hover_color)
         self.btn_recalc.on_clicked(self.recalc_filter)  # Link button to method
 
-        # Create and position "Recalc. filter" button
+        # Create and position "Reset MU" button
         ax_reset = plt.axes([offset + 3*(button_width + spacing), 0.51, button_width, 0.04])
-        self.btn_reset = Button(ax_reset, "Reset MU", color=self.button_color, hovercolor=self.hover_color)
+        self.btn_reset = Button(ax_reset, "Reset MU", color='peachpuff', hovercolor='moccasin')
         self.btn_reset.on_clicked(self.reset_mu)  # Link button to method
 
         # Create and position "Delete MU" button with distinct color
