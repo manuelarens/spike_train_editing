@@ -68,7 +68,7 @@ class EditMU:
         self.mupulses_original = deepcopy(emgfile['MUPULSES'])
 
         # Set initial motor unit index and flags for SIL recalculation
-        self.current_index = 0
+        self.current_index = 5
         self.edited_dict = {}
         self.addrefsig = 1
         self.grid_name = ['4-8-L']
@@ -79,6 +79,7 @@ class EditMU:
         self.wSIG = None
         self.peak_artists = []
         self.sil_recalculated = [False] * len(emgfile['MUPULSES'])
+        self.edge_margin = round(0.15*self.fsamp)
 
         # Calculate SIL values for each motor unit
         self.sil_old = np.zeros(len(emgfile['MUPULSES']))
@@ -91,6 +92,7 @@ class EditMU:
         self.fig, (self.ax1, self.ax2) = plt.subplots(
             2, 1, figsize=(figsize[0] / 2.54, figsize[1] / 2.54), num="IPTS"
         )
+        self.ax2.set_xlim(min(self.x_axis), max(self.x_axis))
         self.fig.subplots_adjust(top=0.9, bottom=0.1, hspace=0.4)
 
         # Share the x-axis between the two subplots
@@ -189,10 +191,12 @@ class EditMU:
         """
         Plot the current motor unit (MU) data (IPTS) on the bottom subplot.
         """
+        xlim = self.ax2.get_xlim()
         self.ax2.clear()  # Clear previous plot on the bottom subplot
         self.ax2.plot(self.x_axis, self.ipts[self.current_index])
         self.ax2.set_ylabel(f"MU {self.current_index + 1}")
         self.ax2.set_xlabel("Time (Sec)" if self.timeinseconds else "Samples")
+        self.ax2.set_xlim(xlim)
 
         # Plot peaks on the bottom subplot
         self.plot_peaks()
@@ -245,13 +249,13 @@ class EditMU:
                 )
                 sil_dif = self.sil_new[self.current_index] - self.sil_old[self.current_index]
                 sil_dif_text = f' (Δ = {sil_dif:.5f})'
-                if sil_dif > 0.02:
+                if sil_dif > 0.01:
                     self.sil_color = 'limegreen'  # Large positive difference
-                elif 0 < sil_dif <= 0.02:
+                elif 0 < sil_dif <= 0.01:
                     self.sil_color = 'lightgreen'  # Small positive difference
                 elif sil_dif == 0:
                     self.sil_color = 'black'  # No difference
-                elif -0.02 <= sil_dif < 0:
+                elif -0.01 <= sil_dif < 0:
                     self.sil_color = 'lightcoral'  # Small negative difference
                 else:
                     self.sil_color = 'red'  # Large negative difference
@@ -354,7 +358,7 @@ class EditMU:
         - direction (str): Zoom direction, either "up" for zoom in or "down" for zoom out.
         """
         current_xlim = self.ax1.get_xlim()  # Get current x-axis limits
-        zoom_factor = 0.85 if direction == "up" else 1.15  # Determine zoom factor
+        zoom_factor = 0.8 if direction == "up" else 1.5  # Determine zoom factor
 
         # Calculate midpoint and delta for new x-axis limits
         midpoint = (current_xlim[0] + current_xlim[1]) / 2
@@ -549,6 +553,7 @@ class EditMU:
 
             # Set the flag to indicate a reset is happening and update the plot
             self.reset_mu_boolean = True
+            self.ax2.set_xlim(min(self.x_axis), max(self.x_axis))
             self.plot_current_mu()  # Redraw the current MU with restored data
             self.fig.canvas.draw_idle()  # Update the canvas to reflect changes
 
@@ -712,6 +717,7 @@ class EditMU:
         """
         if self.current_index > 0:
             self.current_index -= 1
+            self.ax2.set_xlim(min(self.x_axis), max(self.x_axis))
             self.plot_current_mu()
             self.fig.canvas.draw_idle()  # Refresh the canvas to reflect changes
             self.disconnect_buttons()  # Reset spike addition/removal functionalities
@@ -729,6 +735,7 @@ class EditMU:
         """
         if self.current_index < len(self.emgfile["IPTS"].columns) - 1:
             self.current_index += 1
+            self.ax2.set_xlim(min(self.x_axis), max(self.x_axis))
             self.plot_current_mu()
             self.fig.canvas.draw_idle()  # Refresh the canvas to reflect changes
             self.disconnect_buttons()  # Reset spike addition/removal functionalities
@@ -841,7 +848,6 @@ class EditMU:
                 tolerance = 1  # off-by-one errors can occur, this fixes it
                 if index < len(pulses) and abs(pulses[index] - x_idx) <= tolerance:
                     self.emgfile["MUPULSES"][self.current_index] = np.delete(pulses, index)
-                    print(f'pulses[index] = {pulses[index]}')
 
                     # Increment the deletion counter
                     delete_count += 1
@@ -885,10 +891,10 @@ class EditMU:
             return
 
         # Recalculate the pulse train
-        spikes = self.recalc_pulse_train()
+        Pt, spikes = self.recalc_pulse_train()
 
         # Recalculate peaks based on the new pulse train
-        self.recalc_peaks(spikes)
+        self.recalc_peaks(Pt, spikes)
 
         # Plot the updated motor unit
         print("Plotting new MU")
@@ -918,47 +924,65 @@ class EditMU:
         Returns:
             np.ndarray: Array of detected spikes based on the recalculated pulse train.
         """
-        # Initialize RecalcFilter object containing 
-        emg_obj = RecalcFilter(self.emgfile, self.grid_name)
 
-        if self.emg is None: # Only run if not ran before, takes lot of computing time
-            # Get emg data and filter
-            self.emg = emg_obj.signal_dict["data"]
-            self.emg = bandpass_filter(self.emg, emg_obj.signal_dict['fsamp'],emg_type = 0)
+        # Get the current window's limits
+        window = self.ax1.get_xlim()
+        graphstart, graphend = [int(x * self.fsamp) for x in window]
+        graphstart += 1
 
-            # Determine extension factor
-            extension_factor =  round(np.round(emg_obj.ext_factor / len(self.emg)))
+        # Find the indices within the given range
+        idx = self.ipts.index[(self.ipts.index >= graphstart) & (self.ipts.index <= graphend)].to_numpy()
+        #print(f'idx start end {idx[0]} {idx[-1]}')
 
-            # Extend EMG signal
-            emg_obj.signal_dict['extend_obvs_old'] = np.zeros([# Set template
-                1, np.shape(self.emg)[0] * extension_factor, np.shape(self.emg)[1] + extension_factor - 1 - emg_obj.differential_mode
-            ])
-            self.eSIG = extend_emg(emg_obj.signal_dict['extend_obvs_old'][0], self.emg, extension_factor) # Actual extension of signal
-            ReSIG = np.matmul(self.eSIG, self.eSIG.T) / len(self.eSIG)
-            self.iReSIGt = np.linalg.pinv(ReSIG)
+        # Get emg data and filter
+        self.emg = self.emgfile["RAW_SIGNAL"].iloc[idx].to_numpy().T
+        #print(f'Unfiltered emg sample: {self.emg[0,0:9]}')
+        self.emg = bandpass_filter(self.emg, self.fsamp,emg_type = 0)
+        #print(f'Filtered emg sample: {self.emg[0,0:9]}')
 
-            # Perform PCA on extended signal
-            E, D = pcaesig(self.eSIG)
+        ext_factor = 1000
 
-            # Whiten extended signal and get dewhitening matrix
-            self.wSIG, _, self.dewhiteningMatrix = whiteesig(self.eSIG, E, D)      
+        # Determine extension factor
+        extension_factor =  round(np.round(ext_factor / len(self.emg)))
+
+        # Extend EMG signal
+        self.emgfile['extend_obvs_old'] = np.zeros([# Set template
+            1, np.shape(self.emg)[0] * extension_factor, np.shape(self.emg)[1] + extension_factor - 1
+        ])
+        self.eSIG = extend_emg(self.emgfile['extend_obvs_old'][0], self.emg, extension_factor) # Actual extension of signal
+        ReSIG = np.matmul(self.eSIG, self.eSIG.T) / len(self.eSIG)
+        self.iReSIGt = np.linalg.pinv(ReSIG)
+
+        # Perform PCA on extended signal
+        E, D = pcaesig(self.eSIG)
+
+        # Whiten extended signal and get dewhitening matrix
+        self.wSIG, _, self.dewhiteningMatrix = whiteesig(self.eSIG, E, D)  
+
+        #print(f'Size wSIG is {np.shape(self.wSIG)}')   
         
         # Get current spikes, needs to be int type
         spikes = np.array([int(val - 1) for val in self.emgfile["MUPULSES"][self.current_index]], dtype=int)
+        spikes = np.intersect1d(
+        idx[round(self.edge_margin): -round(self.edge_margin)], 
+        spikes
+        )
+        spikes = spikes - idx[0]
         
         # Get whitened signal for the selected spikes
         wSIG_selected = self.wSIG[:, spikes]
 
         # Calculate MUFilters
         MUFilters = np.sum(wSIG_selected, axis=1)
+        print(f'MUFilters first 10 {MUFilters[:10]}')
 
         # Calculate Pulse train
         Pt = ((self.dewhiteningMatrix @ MUFilters).T @ self.iReSIGt) @ self.eSIG
         Pt = Pt[:len(self.emg[0])]  # Adjust the length to match the original EMG signal
 
         # Post-process the pulse train
-        Pt[:round(0.1 * self.fsamp)] = 0
-        Pt[-round(0.1 * self.fsamp):] = 0
+        Pt[:round(self.edge_margin)] = 0
+        Pt[-round(self.edge_margin):] = 0
         Pt = Pt * np.abs(Pt)
         Pt = np.real(Pt)
 
@@ -969,13 +993,19 @@ class EditMU:
         # Scale according to 10 biggest peaks
         Pt /= np.mean(maxk(Pt, 10))
 
-        # Save new pulse train
-        self.emgfile["IPTS"].iloc[:, self.current_index] = Pt
+        Pt_full = self.emgfile["IPTS"].iloc[:, self.current_index].copy()  # Copy full pulse train
+        #print(f'Size Pt_full = {np.shape(Pt_full)}, Size Pt= {np.shape(Pt)}, window size = {graphend - graphstart}')
+        # Adjust the range by excluding 10% of the start and end of both idx and Pt
+
+        # Update only the valid section of Pt_full with the truncated Pt
+        #print(f'Size left = {np.shape(Pt_full[graphstart + adjustment : graphend - adjustment])}, size right is {np.shape(Pt[adjustment:-adjustment -1])}')
+        Pt_full[graphstart + self.edge_margin : graphend - self.edge_margin] = Pt[self.edge_margin:- self.edge_margin -1]
+
+        self.emgfile["IPTS"].iloc[:, self.current_index] = Pt_full  # Save the updated pulse train
         self.ipts[self.current_index] = self.emgfile["IPTS"][self.current_index]
+        return Pt, spikes
 
-        return spikes
-
-    def recalc_peaks(self, spikes):
+    def recalc_peaks(self, Pt, spikes):
         """
         Recalculate peaks by applying k-means clustering and removing outliers.
         Adapted from MUEdit in MATLAB
@@ -990,9 +1020,10 @@ class EditMU:
         Args:
             spikes (np.ndarray): Array of spike indices to be processed.
         """
-        # Access the current motor unit's pulse train and IPTS data
-        Pt = self.emgfile["IPTS"][self.current_index]
-        
+        window = self.ax1.get_xlim()
+        graphstart, graphend = [int(x * self.fsamp) for x in window]
+        graphstart += 1
+                
         # Select pulse values corresponding to the provided spike indices
         pulse_values = np.array(Pt[spikes])
 
@@ -1010,10 +1041,16 @@ class EditMU:
         self.threshold = mean_val + 3 * std_val
         spikes2 = spikes2[Pt[spikes2] <= self.threshold]
         #"""
-        
+
         # Update the MUPULSES with the filtered spikes
-        self.emgfile["MUPULSES"][self.current_index] = spikes2
-        
+        spikes_full = self.emgfile["MUPULSES"][self.current_index] # Copy all spikes
+        spikes_to_replace = np.where((spikes_full >= graphstart) & (spikes_full < graphend))[0]
+        spikes_full = np.delete(spikes_full, spikes_to_replace)  # Remove old spikes in the window
+        spikes_full = np.concatenate((spikes_full, spikes2 + graphstart))  # Add new spikes
+        self.emgfile["MUPULSES"][self.current_index] = np.sort(spikes_full).astype(int) # Save updated spikes
+
+        print(f'MUPulses after {self.emgfile["MUPULSES"][self.current_index][:10]}')
+
     def add_instructions(self):
         """
         Add instructions to the plot as a text box.

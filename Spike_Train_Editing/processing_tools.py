@@ -454,7 +454,7 @@ def get_silohuette(w_n,Z,fsamp):
     peaks, _ = scipy.signal.find_peaks(np.squeeze(source_pred), distance = np.round(fsamp*0.02)+1) # this is approx a value of 20, which is in time approx 10ms
     # peaks = detect_peaks(np.squeeze(source_pred), mpd = np.round(fsamp*0.02))
     
-    print(np.mean(maxk(source_pred[peaks], 10)))
+    #print(np.mean(maxk(source_pred[peaks], 10)))
     source_pred /=  np.mean(maxk(source_pred[peaks], 10)) #normalization of MU pulse train
     if len(peaks) > 1:
 

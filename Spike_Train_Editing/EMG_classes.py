@@ -21,7 +21,7 @@ class EMG():
     
     def __init__(self):
         # processing settings
-        self.its = 100 # number of iterations of the fixed point algorithm 
+        self.its = 50 # number of iterations of the fixed point algorithm 
         self.ref_exist = 1 # Boolean for whether an existing reference is used for signal batching (otherwise, manual selection)
         self.windows = 1  # number of segmented windows over each contraction
         self.check_emg = 0 # Boolean for the review process of EMG channels, where 0 = Automatic selection 1 = Visual checking
@@ -394,8 +394,6 @@ class offline_EMG(EMG):
                 data_slice = self.signal_dict['data'][chans_per_grid*(grid-1):grid*chans_per_grid, int(self.plateau_coords[interval*2]):int(self.plateau_coords[(interval+1)*2-1])+1]
                 rejected_channels_slice = self.rejected_channels[i,:] == 1
                 # Remove rejected channels
-                print(data_slice.shape)
-                print(rejected_channels_slice.shape)
                 batched_data[tracker] = np.delete(data_slice, rejected_channels_slice, 0)
                 tracker += 1
 
