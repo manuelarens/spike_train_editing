@@ -87,6 +87,7 @@ def display_raw_emg(filepath):
     mne_object = data.read_data_MNE(add_ch_locs=True)  # Load data into MNE object
 
     # Filter out unconnected channels (those with all-zero signals)
+    print('Click on the names of channels you want to reject, channels turn transparent when de-selected')
     show_chs = []
     for idx, ch in enumerate(mne_object.get_data()):
         if ch.any():

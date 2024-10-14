@@ -74,7 +74,7 @@ To avoid package conflicts and ensure a consistent environment, it is recommende
      ```
 
 3. **Install Required Packages**:
-   After activating the virtual environment, install all dependencies using the `requirements.txt` file provided in the project directory:
+   After activating the virtual environment, install all dependencies using the `requirements.txt` file provided in the project directory (this may take a minute):
 
    ```bash
    pip install -r requirements.txt

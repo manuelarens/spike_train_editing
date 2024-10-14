@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from processing_tools import *
@@ -674,7 +675,12 @@ class offline_EMG(EMG):
 ######################################## SAVING DATA #####################################################
 
     def save_EMG_decomposition(self, g,tracker): # TODO: Check whether g or tracker? 
-        # adapted from OpenHDEMG, function save_to_json() 
+        # adapted from OpenHDEMG, function save_to_json()
+
+        if not hasattr(self, 'discharge_times'):
+            print("No motor unit have been found, exiting script")
+            sys.exit()
+        
         self.file_path_json = os.path.join(self.savefolder, self.filename +'_decomp.json')
         self.dict["SOURCE"] = "CUSTOMCSV"
         self.dict["FILENAME"] = "training40" 
