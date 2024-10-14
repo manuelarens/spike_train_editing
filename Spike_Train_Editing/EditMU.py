@@ -79,7 +79,7 @@ class EditMU:
         self.wSIG = None
         self.peak_artists = []
         self.sil_recalculated = [False] * len(emgfile['MUPULSES'])
-        self.edge_margin = round(0.15*self.fsamp)
+        self.edge_margin = round(0.1*self.fsamp)
 
         # Calculate SIL values for each motor unit
         self.sil_old = np.zeros(len(emgfile['MUPULSES']))
@@ -938,7 +938,7 @@ class EditMU:
         self.emg = self.emgfile["RAW_SIGNAL"].iloc[idx].to_numpy().T
         #print(f'Unfiltered emg sample: {self.emg[0,0:9]}')
         self.emg = bandpass_filter(self.emg, self.fsamp,emg_type = 0)
-        #print(f'Filtered emg sample: {self.emg[0,0:9]}')
+        print(f'Filtered emg sample: {self.emg[0,0:9]}')
 
         ext_factor = 1000
 
@@ -955,11 +955,11 @@ class EditMU:
 
         # Perform PCA on extended signal
         E, D = pcaesig(self.eSIG)
+        print(f'E sample: {E[:5,:5]}')
+        print(f'D sample: {D[:5,:5]}')
 
         # Whiten extended signal and get dewhitening matrix
-        self.wSIG, _, self.dewhiteningMatrix = whiteesig(self.eSIG, E, D)  
-
-        #print(f'Size wSIG is {np.shape(self.wSIG)}')   
+        self.wSIG, _, self.dewhiteningMatrix = whiteesig(self.eSIG, E, D)
         
         # Get current spikes, needs to be int type
         spikes = np.array([int(val - 1) for val in self.emgfile["MUPULSES"][self.current_index]], dtype=int)
@@ -989,9 +989,11 @@ class EditMU:
         # Detect peaks from new pulse train
         min_peak_distance = round(self.fsamp * 0.01)
         spikes = detect_peaks(Pt, mpd=min_peak_distance)
+        print(f'spikes first 5: {spikes[:5]}')
 
         # Scale according to 10 biggest peaks
         Pt /= np.mean(maxk(Pt, 10))
+        print(f'Pt sample: {Pt[int(10*self.fsamp):int(10*self.fsamp + 20)]}')
 
         Pt_full = self.emgfile["IPTS"].iloc[:, self.current_index].copy()  # Copy full pulse train
         #print(f'Size Pt_full = {np.shape(Pt_full)}, Size Pt= {np.shape(Pt)}, window size = {graphend - graphstart}')
@@ -1030,9 +1032,12 @@ class EditMU:
         # Apply k-means clustering with 2 clusters
         kmeans = KMeans(n_clusters=2, init='k-means++', n_init=1).fit(pulse_values.reshape(-1, 1))
         
+        
         # Determine the cluster with the highest centroid
         spikes_ind = np.argmax(kmeans.cluster_centers_)
         spikes2 = spikes[np.where(kmeans.labels_ == spikes_ind)]
+        print(f'After Kmeans first 5: {spikes2[:5]}')
+        print(f'After Kmeans first 5 in seconds: {(spikes2[:5] + graphstart)/self.fsamp}')
 
         # Optionally remove outliers, removes wrong things a lot of time so turned off for now
         """
@@ -1044,7 +1049,7 @@ class EditMU:
 
         # Update the MUPULSES with the filtered spikes
         spikes_full = self.emgfile["MUPULSES"][self.current_index] # Copy all spikes
-        spikes_to_replace = np.where((spikes_full >= graphstart) & (spikes_full < graphend))[0]
+        spikes_to_replace = np.where((spikes_full >= graphstart + self.edge_margin) & (spikes_full < graphend - self.edge_margin))[0]
         spikes_full = np.delete(spikes_full, spikes_to_replace)  # Remove old spikes in the window
         spikes_full = np.concatenate((spikes_full, spikes2 + graphstart))  # Add new spikes
         self.emgfile["MUPULSES"][self.current_index] = np.sort(spikes_full).astype(int) # Save updated spikes

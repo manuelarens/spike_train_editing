@@ -322,7 +322,7 @@ def pcaesig(signal):
     eigenvectors = eigenvectors[:, sorted_indices]
 
     # Calculate the rank tolerance (regularization factor)
-    rank_tolerance = np.mean(eigenvalues[len(eigenvalues) // 2:])
+    rank_tolerance = np.mean(eigenvalues[len(eigenvalues) // 2 - 1:])
     #print(f'Rank tolerance {rank_tolerance}')
     
     # If rank tolerance is negative, set it to 0
