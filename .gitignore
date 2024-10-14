@@ -5,7 +5,6 @@ dist/
 _docs/build/
 Output/
 measurements/*
-!measurements/.gitkeep
 !measurements/training_measurement-20240611_085328.poly5
 __*.*
 !index.txt
@@ -13,3 +12,4 @@ __*.*
 !TMSiSDK/device/devices/*/measurements/
 _docs/source/_autosummary/
 !TMSiPlugins/WaveX/wavex/measurements
+.venv

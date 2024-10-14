@@ -1,1 +1,0 @@
-allowed_versions = ["1.8.8.0"]
