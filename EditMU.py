@@ -68,7 +68,7 @@ class EditMU:
         self.mupulses_original = deepcopy(emgfile['MUPULSES'])
 
         # Set initial motor unit index and flags for SIL recalculation
-        self.current_index = 5
+        self.current_index = 0
         self.edited_dict = {}
         self.addrefsig = 1
         self.grid_name = ['4-8-L']

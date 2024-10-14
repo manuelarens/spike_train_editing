@@ -41,7 +41,7 @@ import locale
 
 from os.path import join, dirname, realpath
 Reader_dir = dirname(realpath(__file__)) # directory of this file
-modules_dir = join(Reader_dir, '../../') # directory with all modules
+modules_dir = join(Reader_dir, '../') # directory with all modules
 
 
 class Xdf_Reader: 
