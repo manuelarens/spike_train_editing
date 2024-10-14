@@ -22,7 +22,7 @@ This project handles HD-EMG post-processing, including EMG signal decomposition 
 
 ## Downloading or Cloning the Repository
 
-To get started with the project, you can either download or clone the repository from GitHub:
+To get started with the project, you can either download or clone the repository from GitHub (to easily copy code from below, view this .md file at the [GitHub repository](https://github.com/manuelarens/spike_train_editing)):
 
 ### Option 1: Download the Repository
 
@@ -82,7 +82,13 @@ To avoid package conflicts and ensure a consistent environment, it is recommende
 
 ## Run Program
 
-To run the script, execute the `main.py` file. Inside the script, you can select between two modes by changing the `MODE` variable:
+To run the script, execute the `main.py` file.
+
+```bash
+python main.py
+```
+
+Inside the script, you can select between two modes by changing the `MODE` variable:
 
 - **Edit mode**: Assumes you have the path to a pre-decomposed `.json` file, and allows you to edit this file.
 - **Decomposition mode**: Loads a selected `.poly5` file, previews the EMG channels where you can deselect certain channels, decomposes the data into motor units, and proceeds into edit mode for manual refinement of the motor unit spikes.

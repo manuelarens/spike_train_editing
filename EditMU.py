@@ -1,3 +1,7 @@
+import matplotlib
+# Set the desired backend, e.g., 'QtAgg' or 'TkAgg'
+matplotlib.use('QtAgg')
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt

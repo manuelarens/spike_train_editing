@@ -9,3 +9,4 @@ numba==0.60.0
 scikit-learn==1.5.0
 tqdm==4.66.5
 pyxdf==1.16.3
+PySide2==5.15.2.1
