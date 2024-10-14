@@ -6,6 +6,8 @@ _docs/build/
 Output/
 measurements/*
 !measurements/training_measurement-20240611_085328.poly5
+!measurements/training_measurement-20240611_085328_decomp.json
+!measurements/training_measurement-20240611_085328_decomp_edited.json
 __*.*
 !index.txt
 !__init__.py
