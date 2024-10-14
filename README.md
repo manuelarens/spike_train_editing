@@ -26,9 +26,33 @@ To run the script, execute the `main.py` file. Inside the script, you can select
 - **Edit mode**: Assumes you have the path to a pre-decomposed `.json` file, and allows you to edit this file.
 - **Decomposition mode**: Loads a selected `.poly5` file, previews the EMG channels where you can deselect certain channels, decomposes the data into motor units, and proceeds into edit mode for manual refinement of the motor unit spikes.
 
-## Prerequisites
+## Setting Up the Environment
 
-Ensure you have the required Python packages installed. You can install all dependencies using the `requirements.txt` file provided in the project directory. To do this, run the following command:
+To avoid package conflicts and ensure a consistent environment, it is recommended to create and use a virtual environment. Follow these steps:
 
-```bash
-pip install -r requirements.txt
+1. **Create a Virtual Environment**:
+   Open your terminal and navigate to the project directory. Run the following command to create a virtual environment named `.venv`:
+
+   ``` bash
+   python -m venv .venv
+   ```
+
+2. **Activate the Virtual Environment**:
+   - On **Windows**:
+
+     ``` bash
+     .venv\Scripts\activate
+     ```
+
+   - On **macOS/Linux**:
+
+     ```bash
+     source .venv/bin/activate
+     ```
+
+3. **Install Required Packages**:
+   After activating the virtual environment, install all dependencies using the `requirements.txt` file provided in the project directory:
+
+   ```bash
+   pip install -r requirements.txt
+    ```
