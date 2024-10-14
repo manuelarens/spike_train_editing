@@ -19,7 +19,7 @@ This project handles EMG (Electromyography) data processing, including EMG signa
 - **RecalcFilter.py**: Contains the `RecalcFilter` class, used to recalculate the filter for the current motor unit based on user modifications to the spikes. This class is essential for adjusting motor unit detection based on filtered signal updates.
 - **processing_tools.py**: Contains helper functions such as file loading, signal processing, and saving routines.
 
-## Run program
+## Run Program
 
 To run the script, execute the `main.py` file. Inside the script, you can select between two modes by changing the `MODE` variable:
 
@@ -28,23 +28,7 @@ To run the script, execute the `main.py` file. Inside the script, you can select
 
 ## Prerequisites
 
-Ensure you have the following Python packages installed:
-
-- `numpy`
-- `scipy`
-- `mne`
-- `pandas`
-- `matplotlib`
-- `tkinter` (for file dialog)
-- `gzip` (for handling compressed files)
-- `openhdemg`
-- `seaborn`
-- `numba`
-- `scikit-learn`
-- `tqdm`
-
-You can install these dependencies using pip:
+Ensure you have the required Python packages installed. You can install all dependencies using the `requirements.txt` file provided in the project directory. To do this, run the following command:
 
 ```bash
-pip install numpy scipy mne pandas matplotlib tkinter openhdemg seaborn numba scikit-learn tqdm
-```
+pip install -r requirements.txt
