@@ -28,7 +28,7 @@ from EditMU import EditMU
 from reader_files.poly5reader import Poly5Reader
 
 # Define the mode: 'decompose' or 'edit'
-MODE = 'decompose'  # Choose either 'decompose' for .poly5 files or 'edit' for pre-decomposed .json files
+MODE = 'edit'  # Choose either 'decompose' for .poly5 files or 'edit' for pre-decomposed .json files
 
 GRID_NAMES = ['4-8-L']  # If ngrids > 1, fill in ['name_grid1', 'name_grid2', etc...]
 
@@ -63,7 +63,7 @@ def main():
         # Define the path to the pre-decomposed .json file
         filepath_decomp = join(
             MEASUREMENTS_DIR,
-            'training_measurement-20240611_085328_decomp.json'
+            'eigen meting_decomp.json'
         )
 
         #filepath_decomp = join(MEASUREMENTS_DIR, 'training_20240611_085441_decomp.json' #tmsi decomp

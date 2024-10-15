@@ -72,7 +72,7 @@ class EditMU:
         self.mupulses_original = deepcopy(emgfile['MUPULSES'])
 
         # Set initial motor unit index and flags for SIL recalculation
-        self.current_index = 0
+        self.current_index = 5
         self.edited_dict = {}
         self.addrefsig = 1
         self.grid_name = ['4-8-L']
@@ -410,50 +410,38 @@ class EditMU:
         - event (matplotlib.backend_bases.KeyEvent): The key event containing information about the pressed key.
         """
         if event.key in ("left", "a"):
-            self.scroll_left()  # Scroll left through motor units
+            self.scroll("left")  # Scroll left through motor units
         elif event.key in ("right", "d"):
-            self.scroll_right()  # Scroll right through motor units
+            self.scroll("right")  # Scroll right through motor units
         elif event.key in ("up", "w"):
             self.zoom('up')  # Zoom in
-        elif event.key in ("down"):
+        elif event.key == "down":
             self.zoom('down')  # Zoom out
 
-    def scroll_left(self):
+    def scroll(self, direction):
         """
-        Scroll the plot view to the left by a fixed percentage of the current x-axis range.
+        Scroll the plot view left or right by a fixed percentage of the current x-axis range.
 
-        This method ensures the plot view shifts left while staying within valid bounds.
-        If scrolling would exceed the left boundary (0), it adjusts to start from 0.
-        """
-        current_xlim = self.ax1.get_xlim()  # Get current x-axis limits
-        delta = (current_xlim[1] - current_xlim[0]) * 0.1  # Calculate the scrolling delta
+        Parameters:
+        - direction (str): The scroll direction, either "left" or "right".
 
-        # Calculate new x-axis limits, ensuring left limit doesn't go below 0
-        if current_xlim[0] - delta > 0:
-            new_xlim = [current_xlim[0] - delta, current_xlim[1] - delta]  # Scroll left normally
-        else:
-            new_xlim = [0, current_xlim[1] - current_xlim[0]]  # Set left limit to 0 and right proportionally
-
-        # Apply new limits and redraw
-        self.ax1.set_xlim(new_xlim)
-        self.ax2.set_xlim(new_xlim)
-        self.fig.canvas.draw_idle()  # Redraw the canvas
-
-    def scroll_right(self):
-        """
-        Scroll the plot view to the right by a fixed percentage of the current x-axis range.
-
-        This method ensures the plot view shifts right while staying within valid bounds.
-        If scrolling would exceed the right boundary (max(self.x_axis)), it adjusts to end at max(self.x_axis).
+        This method ensures the plot view shifts in the correct direction while staying within valid bounds.
         """
         current_xlim = self.ax1.get_xlim()  # Get current x-axis limits
         delta = (current_xlim[1] - current_xlim[0]) * 0.1  # Calculate the scrolling delta
 
-        # Calculate new x-axis limits, ensuring right limit doesn't exceed max(self.x_axis)
-        if current_xlim[1] + delta < max(self.x_axis):
-            new_xlim = [current_xlim[0] + delta, current_xlim[1] + delta]  # Scroll right normally
-        else:
-            new_xlim = [max(self.x_axis) - (current_xlim[1] - current_xlim[0]), max(self.x_axis)]  # Set right limit to max
+        if direction == "left":
+            # Calculate new x-axis limits for scrolling left, ensuring the left limit doesn't go below 0
+            if current_xlim[0] - delta > 0:
+                new_xlim = [current_xlim[0] - delta, current_xlim[1] - delta]
+            else:
+                new_xlim = [0, current_xlim[1] - current_xlim[0]]  # Set left limit to 0
+        elif direction == "right":
+            # Calculate new x-axis limits for scrolling right, ensuring the right limit doesn't exceed max(self.x_axis)
+            if current_xlim[1] + delta < max(self.x_axis):
+                new_xlim = [current_xlim[0] + delta, current_xlim[1] + delta]
+            else:
+                new_xlim = [max(self.x_axis) - (current_xlim[1] - current_xlim[0]), max(self.x_axis)]  # Set right limit to max
 
         # Apply new limits and redraw
         self.ax1.set_xlim(new_xlim)
@@ -622,7 +610,7 @@ class EditMU:
             if self.current_index >= len(self.emgfile['MUPULSES']):
                 self.current_index = len(self.emgfile['MUPULSES']) - 1
                 if self.current_index == -1:
-                    print("No MUs remaining, closing script")
+                    print("No MUs remaining, closing editor")
                     plt.close(self.fig)
 
             # Plot the current MU if any remain
@@ -633,7 +621,6 @@ class EditMU:
         # Destroy the root window
         root.destroy()
 
-        
     def add_spikes(self, event):
         """
         Toggle the addition of spikes on the plot.
@@ -744,7 +731,6 @@ class EditMU:
             self.fig.canvas.draw_idle()  # Refresh the canvas to reflect changes
             self.disconnect_buttons()  # Reset spike addition/removal functionalities
 
-            
     def onselect_add(self, eclick, erelease):
         """
         Handle the rectangular selection for adding spikes.
@@ -936,17 +922,13 @@ class EditMU:
 
         # Find the indices within the given range
         idx = self.ipts.index[(self.ipts.index >= graphstart) & (self.ipts.index <= graphend)].to_numpy()
-        #print(f'idx start end {idx[0]} {idx[-1]}')
 
         # Get emg data and filter
         self.emg = self.emgfile["RAW_SIGNAL"].iloc[idx].to_numpy().T
-        #print(f'Unfiltered emg sample: {self.emg[0,0:9]}')
         self.emg = bandpass_filter(self.emg, self.fsamp,emg_type = 0)
-        print(f'Filtered emg sample: {self.emg[0,0:9]}')
-
-        ext_factor = 1000
 
         # Determine extension factor
+        ext_factor = 1000
         extension_factor =  round(np.round(ext_factor / len(self.emg)))
 
         # Extend EMG signal
@@ -959,8 +941,6 @@ class EditMU:
 
         # Perform PCA on extended signal
         E, D = pcaesig(self.eSIG)
-        print(f'E sample: {E[:5,:5]}')
-        print(f'D sample: {D[:5,:5]}')
 
         # Whiten extended signal and get dewhitening matrix
         self.wSIG, _, self.dewhiteningMatrix = whiteesig(self.eSIG, E, D)
@@ -978,7 +958,6 @@ class EditMU:
 
         # Calculate MUFilters
         MUFilters = np.sum(wSIG_selected, axis=1)
-        print(f'MUFilters first 10 {MUFilters[:10]}')
 
         # Calculate Pulse train
         Pt = ((self.dewhiteningMatrix @ MUFilters).T @ self.iReSIGt) @ self.eSIG
@@ -993,18 +972,13 @@ class EditMU:
         # Detect peaks from new pulse train
         min_peak_distance = round(self.fsamp * 0.01)
         spikes = detect_peaks(Pt, mpd=min_peak_distance)
-        print(f'spikes first 5: {spikes[:5]}')
 
         # Scale according to 10 biggest peaks
         Pt /= np.mean(maxk(Pt, 10))
-        print(f'Pt sample: {Pt[int(10*self.fsamp):int(10*self.fsamp + 20)]}')
 
         Pt_full = self.emgfile["IPTS"].iloc[:, self.current_index].copy()  # Copy full pulse train
-        #print(f'Size Pt_full = {np.shape(Pt_full)}, Size Pt= {np.shape(Pt)}, window size = {graphend - graphstart}')
-        # Adjust the range by excluding 10% of the start and end of both idx and Pt
 
         # Update only the valid section of Pt_full with the truncated Pt
-        #print(f'Size left = {np.shape(Pt_full[graphstart + adjustment : graphend - adjustment])}, size right is {np.shape(Pt[adjustment:-adjustment -1])}')
         Pt_full[graphstart + self.edge_margin : graphend - self.edge_margin] = Pt[self.edge_margin:- self.edge_margin -1]
 
         self.emgfile["IPTS"].iloc[:, self.current_index] = Pt_full  # Save the updated pulse train
@@ -1026,6 +1000,8 @@ class EditMU:
         Args:
             spikes (np.ndarray): Array of spike indices to be processed.
         """
+
+        # Get current window
         window = self.ax1.get_xlim()
         graphstart, graphend = [int(x * self.fsamp) for x in window]
         graphstart += 1
@@ -1036,12 +1012,9 @@ class EditMU:
         # Apply k-means clustering with 2 clusters
         kmeans = KMeans(n_clusters=2, init='k-means++', n_init=1).fit(pulse_values.reshape(-1, 1))
         
-        
         # Determine the cluster with the highest centroid
         spikes_ind = np.argmax(kmeans.cluster_centers_)
         spikes2 = spikes[np.where(kmeans.labels_ == spikes_ind)]
-        print(f'After Kmeans first 5: {spikes2[:5]}')
-        print(f'After Kmeans first 5 in seconds: {(spikes2[:5] + graphstart)/self.fsamp}')
 
         # Optionally remove outliers, removes wrong things a lot of time so turned off for now
         """
@@ -1057,8 +1030,6 @@ class EditMU:
         spikes_full = np.delete(spikes_full, spikes_to_replace)  # Remove old spikes in the window
         spikes_full = np.concatenate((spikes_full, spikes2 + graphstart))  # Add new spikes
         self.emgfile["MUPULSES"][self.current_index] = np.sort(spikes_full).astype(int) # Save updated spikes
-
-        print(f'MUPulses after {self.emgfile["MUPULSES"][self.current_index][:10]}')
 
     def add_instructions(self):
         """
