@@ -17,7 +17,6 @@ from sklearn.cluster import KMeans
 
 from openhdemg.library.mathtools import compute_sil
 from openhdemg.library.plotemg import showgoodlayout
-from RecalcFilter import RecalcFilter
 from processing_tools import get_binary_pulse_trains, whiteesig, extend_emg, pcaesig, detect_peaks, maxk, bandpass_filter
 
 class EditMU:
@@ -34,14 +33,14 @@ class EditMU:
     4. Supports spike editing through rectangle selectors.
     5. Displays a reference signal if specified.
 
-    Parameters:
-    - emgfile (dict): EMG data in OpenHDEMG .json format containing IPTS, MUPULSES, FSAMP, etc.
-    - filepath (str): Path to the EMG .json file for saving/loading.
-    - addrefsig (bool): Whether to include a reference signal on the plot.
-    - timeinseconds (bool): Whether to plot the x-axis in seconds (True) or samples (False).
-    - figsize (tuple): Size of the figure (in cm) for the plot.
-    - showimmediately (bool): Whether to immediately show the plot upon creation.
-    - tight_layout (bool): Whether to use a tight layout for the plot.
+    Args:
+        emgfile (dict): EMG data in OpenHDEMG .json format containing IPTS, MUPULSES, FSAMP, etc.
+        filepath (str): Path to the EMG .json file for saving/loading.
+        addrefsig (bool): Whether to include a reference signal on the plot.
+        timeinseconds (bool): Whether to plot the x-axis in seconds (True) or samples (False).
+        figsize (tuple): Size of the figure (in cm) for the plot.
+        showimmediately (bool): Whether to immediately show the plot upon creation.
+        tight_layout (bool): Whether to use a tight layout for the plot.
     """
 
     def __init__(
@@ -72,15 +71,10 @@ class EditMU:
         self.mupulses_original = deepcopy(emgfile['MUPULSES'])
 
         # Set initial motor unit index and flags for SIL recalculation
-        self.current_index = 5
+        self.current_index = 0
         self.edited_dict = {}
         self.addrefsig = 1
         self.grid_name = ['4-8-L']
-        self.emg = None
-        self.iReSIGt = None
-        self.dewhiteningMatrix = None
-        self.eSIG = None
-        self.wSIG = None
         self.peak_artists = []
         self.sil_recalculated = [False] * len(emgfile['MUPULSES'])
         self.edge_margin = round(0.1*self.fsamp)
@@ -152,7 +146,6 @@ class EditMU:
             return data
         raise TypeError(f"{name} is probably absent or not in the expected format")
 
-
     def _process_mu_pulses(self, mupulses):
         """
         Process motor unit pulses, converting them to seconds.
@@ -163,8 +156,6 @@ class EditMU:
         if isinstance(mupulses, list):
             return [[pulse / self.fsamp for pulse in pulses] for pulses in mupulses]
         raise TypeError("MUPULSES is probably absent or not in a list")
-
-
 
     def plot_current_mu(self):
         """
@@ -476,12 +467,12 @@ class EditMU:
         # Create and position "Previous" button
         ax_prev = plt.axes([0.01, 0.025, 0.12, 0.04])
         self.btn_prev = Button(ax_prev, "Previous", color=self.button_color, hovercolor=self.hover_color)
-        self.btn_prev.on_clicked(self.previous_mu)  # Link button to method
+        self.btn_prev.on_clicked(lambda event: self.switch_mu("previous", event))
 
         # Create and position "Next" button
         ax_next = plt.axes([0.87, 0.025, 0.12, 0.04])
         self.btn_next = Button(ax_next, "Next", color=self.button_color, hovercolor=self.hover_color)
-        self.btn_next.on_clicked(self.next_mu)  # Link button to method
+        self.btn_next.on_clicked(lambda event: self.switch_mu("next", event))  # Link button to method
 
         # Create and position "Add spikes" button
         ax_add = plt.axes([offset, 0.51, button_width, 0.04])
@@ -695,41 +686,26 @@ class EditMU:
         self.remove_spikes_boolean = False
         self.btn_remove.color = self.button_color
 
-    def previous_mu(self, event):
+    def switch_mu(self, direction, event):
         """
-        Switch to the previous motor unit and update the plot.
-
-        This method decreases the index of the current motor unit, updates the plot to display the previous 
-        motor unit's data, and redraws the canvas. It also disconnects any active spike addition or removal 
-        functionalities.
+        Switch to the previous or next motor unit and update the plot.
 
         Args:
+            direction (str): The direction to switch ('previous' or 'next').
             event: The event object associated with the button click that triggered this method.
         """
-        if self.current_index > 0:
+        if direction == "previous" and self.current_index > 0:
             self.current_index -= 1
-            self.ax2.set_xlim(min(self.x_axis), max(self.x_axis))
-            self.plot_current_mu()
-            self.fig.canvas.draw_idle()  # Refresh the canvas to reflect changes
-            self.disconnect_buttons()  # Reset spike addition/removal functionalities
-
-    def next_mu(self, event):
-        """
-        Switch to the next motor unit and update the plot.
-
-        This method increases the index of the current motor unit, updates the plot to display the next 
-        motor unit's data, and redraws the canvas. It also disconnects any active spike addition or removal 
-        functionalities.
-
-        Args:
-            event: The event object associated with the button click that triggered this method.
-        """
-        if self.current_index < len(self.emgfile["IPTS"].columns) - 1:
+        elif direction == "next" and self.current_index < len(self.emgfile["IPTS"].columns) - 1:
             self.current_index += 1
-            self.ax2.set_xlim(min(self.x_axis), max(self.x_axis))
-            self.plot_current_mu()
-            self.fig.canvas.draw_idle()  # Refresh the canvas to reflect changes
-            self.disconnect_buttons()  # Reset spike addition/removal functionalities
+        else:
+            return  # If index is out of bounds, do nothing
+
+        # Update plot and redraw canvas
+        self.ax2.set_xlim(min(self.x_axis), max(self.x_axis))
+        self.plot_current_mu()
+        self.fig.canvas.draw_idle()  # Refresh the canvas to reflect changes
+        self.disconnect_buttons()  # Reset spike addition/removal functionalities
 
     def onselect_add(self, eclick, erelease):
         """
@@ -924,26 +900,26 @@ class EditMU:
         idx = self.ipts.index[(self.ipts.index >= graphstart) & (self.ipts.index <= graphend)].to_numpy()
 
         # Get emg data and filter
-        self.emg = self.emgfile["RAW_SIGNAL"].iloc[idx].to_numpy().T
-        self.emg = bandpass_filter(self.emg, self.fsamp,emg_type = 0)
+        emg = self.emgfile["RAW_SIGNAL"].iloc[idx].to_numpy().T
+        emg = bandpass_filter(emg, self.fsamp,emg_type = 0)
 
         # Determine extension factor
         ext_factor = 1000
-        extension_factor =  round(np.round(ext_factor / len(self.emg)))
+        extension_factor =  round(np.round(ext_factor / len(emg)))
 
         # Extend EMG signal
         self.emgfile['extend_obvs_old'] = np.zeros([# Set template
-            1, np.shape(self.emg)[0] * extension_factor, np.shape(self.emg)[1] + extension_factor - 1
+            1, np.shape(emg)[0] * extension_factor, np.shape(emg)[1] + extension_factor - 1
         ])
-        self.eSIG = extend_emg(self.emgfile['extend_obvs_old'][0], self.emg, extension_factor) # Actual extension of signal
-        ReSIG = np.matmul(self.eSIG, self.eSIG.T) / len(self.eSIG)
-        self.iReSIGt = np.linalg.pinv(ReSIG)
+        eSIG = extend_emg(self.emgfile['extend_obvs_old'][0], emg, extension_factor) # Actual extension of signal
+        ReSIG = np.matmul(eSIG, eSIG.T) / len(eSIG)
+        iReSIGt = np.linalg.pinv(ReSIG)
 
         # Perform PCA on extended signal
-        E, D = pcaesig(self.eSIG)
+        E, D = pcaesig(eSIG)
 
         # Whiten extended signal and get dewhitening matrix
-        self.wSIG, _, self.dewhiteningMatrix = whiteesig(self.eSIG, E, D)
+        wSIG, _, dewhiteningMatrix = whiteesig(eSIG, E, D)
         
         # Get current spikes, needs to be int type
         spikes = np.array([int(val - 1) for val in self.emgfile["MUPULSES"][self.current_index]], dtype=int)
@@ -954,14 +930,14 @@ class EditMU:
         spikes = spikes - idx[0]
         
         # Get whitened signal for the selected spikes
-        wSIG_selected = self.wSIG[:, spikes]
+        wSIG_selected = wSIG[:, spikes]
 
         # Calculate MUFilters
         MUFilters = np.sum(wSIG_selected, axis=1)
 
         # Calculate Pulse train
-        Pt = ((self.dewhiteningMatrix @ MUFilters).T @ self.iReSIGt) @ self.eSIG
-        Pt = Pt[:len(self.emg[0])]  # Adjust the length to match the original EMG signal
+        Pt = ((dewhiteningMatrix @ MUFilters).T @ iReSIGt) @ eSIG
+        Pt = Pt[:len(emg[0])]  # Adjust the length to match the original EMG signal
 
         # Post-process the pulse train
         Pt[:round(self.edge_margin)] = 0
