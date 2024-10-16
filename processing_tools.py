@@ -554,7 +554,6 @@ def batch_process_filters(MU_filters, wSIG, plateau_coord, exfactor,diff,ltime,f
     # mu filters has size no_windows x exten chans x (maximum of) x no iterations  --> less if iterations failed to reach SIL threshold
     # ltime: size(signal.data,2)
     mu_count = 0
-    print(np.shape(wSIG)[0])
     for win in range (np.shape(wSIG)[0]): #amount of windows  
         mu_count += np.size(MU_filters[win][0]) # columns of MU_filters 
     

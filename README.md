@@ -16,9 +16,10 @@ This project handles HD-EMG post-processing, including EMG signal decomposition 
 - **EditMU.py**: Contains the `EditMU` class, which provides the interface for manually editing motor unit peaks (add/remove peaks, adjust spike times).
 - **EMG_Decomposition.py**: Contains the `EMGDecomposition` class, which handles the offline EMG decomposition process given a .poly5 file. This class also provides options to reject noisy channels.
 - **EMG_classes.py**: Defines the EMG-related classes and utilities used throughout the project.
-- **RecalcFilter.py**: Contains the `RecalcFilter` class, used to recalculate the filter for the current motor unit based on user modifications to the spikes. This class is essential for adjusting motor unit detection based on filtered signal updates.
 - **processing_tools.py**: Contains helper functions such as file loading, signal processing, and saving routines.
 - **./measurements**: Directory where all measurements are stored and saved after processing. A sample measurement and (edited) decomposition is added.
+- **./reader_files**: Files that handle reading of certain file types.
+- **jsontomat.m**: A MATLAB script that converts OpenHDEMG-style `.json` files into `.mat` files, making the data compatible with MUEdit for further analysis. The script decompresses, decodes, and organizes EMG data, including motor unit pulse trains and associated metadata, and saves the output in `.mat` format. This allows comparison between datasets processed in OpenHDEMG and those used in MUEdit.
 
 ## Downloading or Cloning the Repository
 

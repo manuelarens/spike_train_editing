@@ -317,7 +317,7 @@ class EditMU:
         pulses = pulses[self.current_index]
 
         # Clear existing peak artists from the plot
-        if hasattr(self, 'peak_artists') and self.peak_artists:
+        if self.peak_artists:
             for peak_artist in self.peak_artists:
                 peak_artist.remove()  # Remove each peak from the plot
 
@@ -847,7 +847,6 @@ class EditMU:
         Args:
             event: The event that triggered the recalculation, typically a button click.
         """
-        print('Recalculating pulse train...')
         self.disconnect_buttons()
         self.btn_recalc.color = self.button_active_color
 
@@ -855,6 +854,7 @@ class EditMU:
         if len(self.emgfile["MUPULSES"][self.current_index]) == 0:
             print('No pulses selected, please select pulses or delete MU')
             return
+        print('Recalculating pulse train...')
 
         # Recalculate the pulse train
         Pt, spikes = self.recalc_pulse_train()
@@ -1028,9 +1028,6 @@ class EditMU:
         """
         Saves the decomposed EMG data into a JSON file, compressing it using gzip.
         The function adapts the 'save_to_json()' method from OpenHDEMG.
-
-        The saved file will contain details about the raw EMG signal, reference signal, 
-        accuracy, pulse trains (MUPULSES), binary motor unit firings, and other metadata.
 
         The resulting JSON file is saved in the same folder as the input EMG file, 
         and the filename is appended with '_edited'.

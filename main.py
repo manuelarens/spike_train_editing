@@ -75,7 +75,6 @@ def main():
     # Load decomposed motor units and enable editing
     edit_decomposed_mu(filepath_decomp)
 
-
 def display_raw_emg(filepath):
     """
     Function to read and display raw EMG data from the selected file.
@@ -104,7 +103,6 @@ def display_raw_emg(filepath):
     )  
     return data_object.info['bads']
 
-
 def run_offline_decomposition(filepath, rejected_chan):
     """
     Function to run offline EMG decomposition on the selected file.
@@ -122,7 +120,6 @@ def run_offline_decomposition(filepath, rejected_chan):
 
     return filepath_decomp
 
-
 def edit_decomposed_mu(filepath_decomp):
     """
     Function to load the decomposed motor units from a JSON file,
@@ -139,9 +136,11 @@ def edit_decomposed_mu(filepath_decomp):
     mu_editor = EditMU(emgfile, filepath_decomp)
 
     # Save the edited motor units back to a file
+    print('Saving edited decomposition...')
     filepath_decomp_edited = mu_editor.save_EMG_decomposition()
 
     # Load and plot the edited motor units
+    print('Save complete! Showing new spike trains')
     emgfile_edited = emg_from_json(filepath_decomp_edited)
     emgfile_edited = emg.sort_mus(emgfile_edited)
     emg.plot_mupulses(emgfile_edited)
