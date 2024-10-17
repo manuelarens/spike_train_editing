@@ -1,6 +1,6 @@
 # EMG Decomposition and Motor Unit Editing
 
-This project handles HD-EMG post-processing, including EMG signal decomposition to extract motor units (MUs) and provides an interface to manually edit the detected motor unit peaks.
+This project handles HD-EMG post-processing, including EMG signal decomposition to extract motor units (MUs) and provides an interface to manually edit the detected motor unit peaks. Consult the User Manual pdf in the repository for more details. This program has been created and tested in Python 3.10.5.
 
 ## Features
 
@@ -19,7 +19,7 @@ This project handles HD-EMG post-processing, including EMG signal decomposition 
 - **processing_tools.py**: Contains helper functions such as file loading, signal processing, and saving routines.
 - **./measurements**: Directory where all measurements are stored and saved after processing. A sample measurement and (edited) decomposition is added.
 - **./reader_files**: Files that handle reading of certain file types.
-- **jsontomat.m**: A MATLAB script that converts OpenHDEMG-style `.json` files into `.mat` files, making the data compatible with MUEdit for further analysis. The script decompresses, decodes, and organizes EMG data, including motor unit pulse trains and associated metadata, and saves the output in `.mat` format. This allows comparison between datasets processed in OpenHDEMG and those used in MUEdit.
+- **jsontomat.m**: A MATLAB script that converts OpenHDEMG-style `.json` files into `.mat` files, making the data compatible with MUEdit for further analysis. The script decompresses, decodes, and organizes EMG data, including motor unit pulse trains and associated metadata, and saves the output in `.mat` format. This allows comparison between datasets processed this program and those used in MUEdit.
 
 ## Downloading or Cloning the Repository
 
