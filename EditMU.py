@@ -762,11 +762,11 @@ class EditMU:
                 index = np.searchsorted(pulses, x_idx)
                 self.emgfile["MUPULSES"][self.current_index] = np.insert(pulses, index, x_idx)
 
-        # Refresh the canvas to reflect changes
-        self.plot_discharge_rate()
-        current_xlim = self.ax2.get_xlim()
-        self.ax1.set_xlim(current_xlim)
-        self.fig.canvas.draw_idle()
+                # Refresh the canvas to reflect changes
+                self.plot_discharge_rate()
+                current_xlim = self.ax2.get_xlim()
+                self.ax1.set_xlim(current_xlim)
+                self.fig.canvas.draw_idle()        
 
     def onselect_remove(self, eclick, erelease):
         """
@@ -792,8 +792,7 @@ class EditMU:
 
         # Create a mask to filter data within the selected rectangular region
         mask = (
-            (self.x_axis > min(x1, x2))
-            & (self.x_axis < max(x1, x2))
+            (self.x_axis > min(x1, x2)) & (self.x_axis < max(x1, x2))
             & (self.emgfile["IPTS"][self.current_index] > min(y1, y2))
             & (self.emgfile["IPTS"][self.current_index] < max(y1, y2))
         )
@@ -820,16 +819,13 @@ class EditMU:
                     if delete_count >= max_deletions:
                         # Stop if the maximum number of deletions is reached
                         print('Limit of 10 deletions at a time reached')
-
-                        # Update the figure with the remaining peaks
-                        self.plot_peaks()
-                        self.fig.canvas.draw_idle()
-                        return
+                        break
 
             # Update the figure with the remaining peaks
-            self.plot_peaks()
-            self.plot_discharge_rate()
-            self.fig.canvas.draw_idle()
+            if delete_count > 0:
+                self.plot_peaks()
+                self.plot_discharge_rate()
+                self.fig.canvas.draw_idle()
     
     def recalc_filter(self, event):
         """
