@@ -593,7 +593,8 @@ class EditMU:
 
             # Update internal state variables
             self.sil_recalculated.pop(self.current_index)
-            self.ipts_original.pop(self.current_index)
+            self.ipts_original.drop(columns=[self.current_index], inplace=True)
+            self.ipts_original.columns = range(self.ipts_original.shape[1])
             self.sil_old = np.delete(self.sil_old, self.current_index)
             self.sil_new = np.delete(self.sil_new, self.current_index)
 
