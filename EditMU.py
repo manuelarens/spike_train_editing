@@ -781,52 +781,48 @@ class EditMU:
             eclick: The mouse click event at the start of the selection.
             erelease: The mouse release event at the end of the selection.
         """
-        # Extract coordinates from the click and release events
-        x1, x2 = eclick.xdata, erelease.xdata
-        y1, y2 = eclick.ydata, erelease.ydata
+        # Extract the rectangle boundaries from the click and release events
+        x1, x2 = sorted([eclick.xdata, erelease.xdata])  # Ensure x1 <= x2
+        y1, y2 = sorted([eclick.ydata, erelease.ydata])  # Ensure y1 <= y2
 
-        # Ensure coordinates are ordered from min to max
-        if x1 > x2:
-            x1, x2 = x2, x1
-        if y1 > y2:
-            y1, y2 = y2, y1
+        # Get the current motor unit's pulses and corresponding IPTS (y-values)
+        pulses = self.emgfile["MUPULSES"][self.current_index]  # Indices of peaks
+        y_values = self.emgfile["IPTS"][self.current_index]    # Amplitude values for peaks
 
-        # Create a mask to filter data within the selected rectangular region
-        mask = (
-            (self.x_axis > min(x1, x2)) & (self.x_axis < max(x1, x2))
-            & (self.emgfile["IPTS"][self.current_index] > min(y1, y2))
-            & (self.emgfile["IPTS"][self.current_index] < max(y1, y2))
-        )
-        xmasked = self.x_axis[mask]
-        ymasked = self.emgfile["IPTS"][self.current_index][mask]
+        # Initialize a list to keep track of the indices to remove
+        indices_to_remove = []
 
-        # Initialize a deletion counter and set a maximum number of deletions
-        delete_count = 0
+        # Maximum number of deletions allowed
         max_deletions = 10
+        delete_count = 0
 
-        if len(xmasked) > 0:
-            # Iterate over the selected peaks and remove them
-            for i, (xmax, ymax) in enumerate(zip(xmasked, ymasked)):
-                # Find the closest pulse (in samples) to remove
-                x_idx = int(xmax * self.fsamp)  # Convert xmax to sample index
-                pulses = self.emgfile["MUPULSES"][self.current_index]
-                index = np.searchsorted(pulses, x_idx)
-                tolerance = 1  # off-by-one errors can occur, this fixes it
-                if index < len(pulses) and abs(pulses[index] - x_idx) <= tolerance:
-                    self.emgfile["MUPULSES"][self.current_index] = np.delete(pulses, index)
+        # Iterate through the pulses to check which are inside the selected rectangle
+        for i, pulse in enumerate(pulses):
+            # Convert pulse (which is an index) to time in seconds
+            time = pulse / self.fsamp
+            
+            # Get the corresponding y-value for this pulse
+            amplitude = y_values[pulse]
 
-                    # Increment the deletion counter
-                    delete_count += 1
-                    if delete_count >= max_deletions:
-                        # Stop if the maximum number of deletions is reached
-                        print('Limit of 10 deletions at a time reached')
-                        break
+            # Check if this pulse falls within the selected rectangular area
+            if x1 <= time <= x2 and y1 <= amplitude <= y2:
+                indices_to_remove.append(i)
+                delete_count += 1
 
-            # Update the figure with the remaining peaks
-            if delete_count > 0:
-                self.plot_peaks()
-                self.plot_discharge_rate()
-                self.fig.canvas.draw_idle()
+                # Stop if the maximum number of deletions is reached
+                if delete_count >= max_deletions:
+                    print(f'Maximum of {max_deletions} deletions reached')
+                    break
+
+        # If we have spikes to remove, perform the removal
+        if indices_to_remove:
+            # Delete the pulses from MUPULSES
+            self.emgfile["MUPULSES"][self.current_index] = np.delete(pulses, indices_to_remove)
+
+            # Update the plots to reflect the changes
+            self.plot_peaks()
+            self.plot_discharge_rate()
+            self.fig.canvas.draw_idle()
     
     def recalc_filter(self, event):
         """
