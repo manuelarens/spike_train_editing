@@ -2,14 +2,6 @@
 
 This project handles HD-EMG post-processing, including EMG signal decomposition to extract motor units (MUs) and provides an interface to manually edit the detected motor unit peaks. Consult the User Manual pdf in the repository for more details. This program has been created and tested in Python 3.10.5.
 
-## Features
-
-- **EMG Data File Selection**: Users can select and load EMG data from a Poly5, preferably with force reference signal. This Poly5 file should be a training file where a trapezoidal force profile is followed. In **edit mode**, users provide the path to a pre-decomposed JSON file of OpenHDEMG formatting.
-- **Offline EMG Decomposition**: Decomposes EMG data into motor units and saves them as a JSON file. The decomposition process includes the ability to reject noisy or unconnected channels before decomposition.
-- **Motor Unit Visualization**: Displays raw EMG signals and decomposed motor unit firing patterns.
-- **Manual Editing of Motor Units**: Provides an interactive interface to adjust motor unit peaks by adding, removing, or adjusting spikes.
-- **Saving Edited Motor Units**: Edited motor unit data can be saved back to a file. The saved file will be placed in the same directory as the selected input file with a ``_edited`` suffix added.
-
 ## Files and Directories
 
 - **main.py**: The main script that runs the full EMG decomposition and editing workflow. Run this script and select a file to be decomposed or edit the decomposition. The mode can be set inside the script by changing the `MODE` variable (`'decompose'` or `'edit'`).
