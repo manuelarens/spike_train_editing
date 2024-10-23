@@ -1,6 +1,6 @@
 # EMG Decomposition and Motor Unit Editing
 
-This project handles HD-EMG post-processing, including EMG signal decomposition to extract motor units (MUs) and provides an interface to manually edit the detected motor unit peaks. Consult the User Manual pdf in the repository for more details. This program has been created and tested in Python 3.10.5.
+This project handles HD-EMG post-processing, including EMG signal decomposition to extract motor units (MUs) and provides an interface to manually edit the detected motor unit peaks. Consult the User Manual pdf in the repository for more details. This program has been created and tested in Python 3.10.5, make sure this version or later is installed on your device.
 
 ## Files and Directories
 
