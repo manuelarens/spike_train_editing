@@ -1,16 +1,6 @@
 # ignore pycache-folders
 __pycache__/
-.*/
-dist/
-_docs/build/
-Output/
+.venv
 measurements/*
 !measurements/training_measurement-20240611_085328.poly5
 !measurements/training_20240611_085441_decomp.json
-__*.*
-!index.txt
-!__init__.py
-!TMSiSDK/device/devices/*/measurements/
-_docs/source/_autosummary/
-!TMSiPlugins/WaveX/wavex/measurements
-.venv
