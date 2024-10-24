@@ -4,3 +4,4 @@ __pycache__/
 measurements/*
 !measurements/training_measurement-20240611_085328.poly5
 !measurements/training_20240611_085441_decomp.json
+RoA_test_files/*

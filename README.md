@@ -12,6 +12,7 @@ This project handles HD-EMG post-processing, including EMG signal decomposition 
 - **./measurements**: Directory where all measurements are stored and saved after processing. A sample measurement and decomposition is added.
 - **./reader_files**: Files that handle reading of certain file types.
 - **jsontomat.m**: A MATLAB script that converts OpenHDEMG-style `.json` files into `.mat` files, making the data compatible with MUEdit for further analysis. The script decompresses, decodes, and organizes EMG data, including motor unit pulse trains and associated metadata, and saves the output in `.mat` format. This allows direct comparison between datasets processed using this program and those used in MUEdit.
+- **RoA.py**: Given two decomp files, it gives the RoA between them.
 
 ## Downloading or Cloning the Repository
 
